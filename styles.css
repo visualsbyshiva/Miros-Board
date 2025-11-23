@@ -1,0 +1,236 @@
+:root {
+  color-scheme: light;
+  font-family: "Helvetica Neue", Arial, sans-serif;
+  background-color: #f4f4f4;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background-color: #e7e7e7;
+  display: flex;
+  min-height: 100vh;
+  align-items: stretch;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.dashboard {
+  background-color: #fdfdfd;
+  border: 4px solid #7d7d7d;
+  border-radius: 18px;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 2rem;
+  width: min(1100px, 100%);
+  padding: clamp(1.5rem, 2vw + 1rem, 2.5rem);
+}
+
+.dashboard__header {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr auto auto auto;
+  gap: 1rem;
+  align-items: center;
+}
+
+.dashboard__input,
+.dashboard__select {
+  border: 3px solid #7d7d7d;
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  font-size: 1rem;
+  background-color: #ffffff;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.dashboard__input:focus,
+.dashboard__select:focus {
+  border-color: #4a4a4a;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05);
+  outline: none;
+}
+
+.dashboard__button {
+  border: 3px solid #7d7d7d;
+  border-radius: 10px;
+  padding: 0.75rem 1.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  background-color: #f9f9f9;
+  color: #353535;
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.dashboard__button:hover {
+  background-color: #ececec;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+}
+
+.dashboard__button:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.dashboard__button--primary {
+  background-color: #585858;
+  color: #ffffff;
+}
+
+.dashboard__button--primary:hover {
+  background-color: #4a4a4a;
+}
+
+.dashboard__button--ghost {
+  background-color: transparent;
+  color: #3d3d3d;
+}
+
+.dashboard__button--ghost:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.dashboard__status {
+  margin: -1rem 0 0;
+  min-height: 1.25rem;
+  font-size: 0.95rem;
+  color: #4a4a4a;
+}
+
+.dashboard__status[data-status="pending"] {
+  color: #8a6d1a;
+}
+
+.dashboard__status[data-status="error"] {
+  color: #a13131;
+}
+
+.dashboard__status[data-status="success"] {
+  color: #29623c;
+}
+
+.dashboard__results {
+  border: 5px solid #7d7d7d;
+  border-radius: 16px;
+  display: flex;
+  background-color: #fafafa;
+  padding: clamp(2rem, 5vw, 3.5rem);
+}
+
+.results-card {
+  width: 100%;
+  color: #2f2f2f;
+}
+
+.results-card__title {
+  font-size: clamp(1.2rem, 2vw, 1.6rem);
+  margin: 0;
+  font-weight: 600;
+}
+
+.results-card__subtitle {
+  margin: 0.5rem 0 0;
+  font-size: 1rem;
+  color: #555555;
+}
+
+.results-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.results-summary {
+  font-size: 0.95rem;
+  color: #3f3f3f;
+  margin-bottom: 1.25rem;
+}
+
+.results-grid-wrapper {
+  overflow-x: auto;
+}
+
+.results-grid {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.95rem;
+  background-color: #ffffff;
+  border: 1px solid #d5d5d5;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.results-grid th,
+.results-grid td {
+  padding: 0.85rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid #e7e7e7;
+}
+
+.results-grid th {
+  background-color: #f2f2f2;
+  font-weight: 600;
+  color: #3b3b3b;
+  position: sticky;
+  top: 0;
+}
+
+.results-grid tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.results-grid a {
+  color: #2b5dab;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.results-grid a:hover {
+  text-decoration: underline;
+}
+
+.results-empty {
+  text-align: center;
+  color: #6b6b6b;
+  font-style: italic;
+}
+
+.dashboard__footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 768px) {
+  body {
+    padding: 1rem;
+  }
+
+  .dashboard {
+    gap: 1.5rem;
+  }
+
+  .dashboard__header {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .dashboard__button,
+  .dashboard__select {
+    width: 100%;
+  }
+
+  .dashboard__footer {
+    justify-content: center;
+  }
+}
+
+

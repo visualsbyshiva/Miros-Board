@@ -1,0 +1,1502 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Collection Builder Dashboard</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script type="module" src="https://content.miros.services/frontend/public/main/container/assets/container.bundle.js" data-miros-integration-id="fb97f7d4-fe95-402f-a81a-402cb062eaa3"></script>
+  </head>
+  <body>
+    <main class="dashboard">
+      <header class="dashboard__header">
+        <input
+          type="text"
+          class="dashboard__input"
+          id="searchInput"
+          placeholder="Enter search term or SKU"
+          aria-label="Enter search term or SKU"
+        />
+        <select
+          class="dashboard__select"
+          id="categorySelect"
+          aria-label="Select product category"
+        >
+          <option value="Fashion">Fashion</option>
+          <option value="Womenswear">Womenswear</option>
+          <option value="Menswear">Menswear</option>
+          <option value="Accessories">Accessories</option>
+          <option value="Footwear">Footwear</option>
+        </select>
+        <button type="button" class="dashboard__button" id="uploadTrigger">
+          Upload Image
+        </button>
+        <input
+          type="file"
+          id="uploadInput"
+          accept="image/*"
+          hidden
+          aria-hidden="true"
+        />
+        <button
+          type="button"
+          class="dashboard__button dashboard__button--primary"
+          id="searchButton"
+        >
+          Search
+        </button>
+        <div
+          id="mirosEntry"
+          data-miros-entry="miros-on-search"
+          aria-hidden="true"
+        ></div>
+      </header>
+      <p class="dashboard__status" id="statusMessage" aria-live="polite"></p>
+      <section class="dashboard__results">
+        <div class="results-card">
+          <div class="results-card__header">
+            <div>
+              <h1 class="results-card__title">
+                Search Results for Similar Products Recommendation
+              </h1>
+              <p class="results-card__subtitle">
+                Showing up to the top 12 matched items from Miros
+              </p>
+            </div>
+            <button
+              type="button"
+              class="dashboard__button dashboard__button--ghost"
+              id="clearResultsButton"
+            >
+              Clear Results
+            </button>
+          </div>
+          <div class="results-summary" id="resultsSummary">
+            Enter a search term, SKU ID, or upload an image to see product-level
+            recommendations here.
+          </div>
+          <div class="results-grid-wrapper" role="region" aria-live="polite">
+            <table class="results-grid" id="resultsGrid">
+              <thead>
+                <tr>
+                  <th scope="col">Product Title</th>
+                  <th scope="col">Option ID</th>
+                  <th scope="col">Colour Variant ID</th>
+                  <th scope="col">CP Product URL</th>
+                  <th scope="col">Super Category</th>
+                  <th scope="col">CP Department</th>
+                  <th scope="col">CP Key Section</th>
+                  <th scope="col">CP Pref Category</th>
+                </tr>
+              </thead>
+              <tbody id="resultsBody">
+                <tr>
+                  <td colspan="8" class="results-empty">
+                    Waiting for your first search…
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+      <footer class="dashboard__footer">
+        <button type="button" class="dashboard__button">Download</button>
+      </footer>
+    </main>
+    <script>
+      (function () {
+        const trigger = document.getElementById("uploadTrigger");
+        const fileInput = document.getElementById("uploadInput");
+        const searchBtn = document.getElementById("searchButton");
+        const searchInput = document.getElementById("searchInput");
+        const categorySelect = document.getElementById("categorySelect");
+        const mirosEntry = document.getElementById("mirosEntry");
+        const statusMessage = document.getElementById("statusMessage");
+        const resultsSummary = document.getElementById("resultsSummary");
+        const resultsBody = document.getElementById("resultsBody");
+        const clearResultsBtn = document.getElementById("clearResultsButton");
+
+        const ENTRY_ATTRS = [
+          "item",
+          "nlp",
+          "category",
+          "image-url",
+          "sizes",
+          "lang",
+        ];
+
+        // This helper shows a friendly status message so people know what is happening.
+        const showStatus = (message, type = "info") => {
+          if (!statusMessage) return;
+          statusMessage.textContent = message;
+          statusMessage.dataset.status = type;
+        };
+
+        // This helper wipes the status text when we are done talking to the user.
+        const clearStatus = () => {
+          if (!statusMessage) return;
+          statusMessage.textContent = "";
+          statusMessage.dataset.status = "";
+        };
+
+        // This helper turns the raw number of hits into a short sentence kids can read.
+        const summariseResults = (count) => {
+          if (!resultsSummary) return;
+
+          if (!count) {
+            resultsSummary.textContent =
+              "No matches returned from Miros. Adjust filters or try another input.";
+            return;
+          }
+
+          resultsSummary.textContent = `${count} product${
+            count === 1 ? "" : "s"
+          } returned from Miros.`;
+        };
+
+        // This helper resets the table so we are not showing old items by mistake.
+        const clearResults = () => {
+          if (resultsBody) {
+            resultsBody.innerHTML =
+              '<tr><td colspan="8" class="results-empty">Results cleared. Run a new search to see recommendations.</td></tr>';
+          }
+          if (resultsSummary) {
+            resultsSummary.textContent =
+              "Results cleared. Enter a new search term, SKU ID, or upload an image to refresh.";
+          }
+        };
+
+        // This helper builds the table rows so we can actually see the product cards.
+        const renderResults = (items = []) => {
+          if (!resultsBody) return;
+
+          if (!items.length) {
+            resultsBody.innerHTML =
+              '<tr><td colspan="8" class="results-empty">No matching products found.</td></tr>';
+            summariseResults(0);
+            return;
+          }
+
+          const rows = items.map((item) => {
+            const {
+              productTitle = "-",
+              optionId = "-",
+              colourVariantId = "-",
+              url = "",
+              superCategory = "-",
+              department = "-",
+              keySection = "-",
+              preferredCategory = "-",
+            } = item;
+
+            const safeUrl = url
+              ? `<a href="${url}" target="_blank" rel="noopener noreferrer">View</a>`
+              : "-";
+
+            return `
+              <tr>
+                <td>${productTitle}</td>
+                <td>${optionId}</td>
+                <td>${colourVariantId}</td>
+                <td>${safeUrl}</td>
+                <td>${superCategory}</td>
+                <td>${department}</td>
+                <td>${keySection}</td>
+                <td>${preferredCategory}</td>
+              </tr>
+            `;
+          });
+
+          resultsBody.innerHTML = rows.join("");
+          summariseResults(items.length);
+        };
+
+        // Miros API configuration - using Integration ID only (no API key)
+        const MIROS_API_URL = 'https://api.miros.services/graphql';
+        const MIROS_INTEGRATION_ID = 'fb97f7d4-fe95-402f-a81a-402cb062eaa3';
+        const MIROS_SLOT = 1; // Default slot for autocomplete suggestions
+
+        // Direct API call to Miros GraphQL (no popup - fills table directly)
+        async function callMirosAPI(query, variables) {
+          try {
+            const response = await fetch(MIROS_API_URL, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Integration-Id': MIROS_INTEGRATION_ID,
+                // Try without API key first - some integrations work with just Integration ID
+              },
+              body: JSON.stringify({ query, variables }),
+            });
+
+            if (!response.ok) {
+              const errorText = await response.text();
+              throw new Error(`Miros API error (${response.status}): ${errorText}`);
+            }
+
+            const data = await response.json();
+
+            if (data.errors) {
+              // If we get authentication errors, user might need API key
+              const authError = data.errors.find(e => 
+                e.message?.toLowerCase().includes('auth') || 
+                e.message?.toLowerCase().includes('unauthorized') ||
+                e.message?.toLowerCase().includes('api key')
+              );
+              
+              if (authError) {
+                throw new Error('Authentication required. You may need to provide an API key in the request headers. Check Miros documentation for API authentication.');
+              }
+              
+              // Log schema errors to help debug
+              console.error('Miros GraphQL Schema Errors:', data.errors);
+              throw new Error(`Miros API errors: ${JSON.stringify(data.errors)}`);
+            }
+
+            return data.data;
+          } catch (error) {
+            console.error('Error calling Miros API:', error);
+            throw error;
+          }
+        }
+
+        // Introspect GraphQL schema to find ALL available queries
+        async function introspectMirosSchema() {
+          // Get full schema - all types and queries
+          const fullSchemaQuery = `
+            query IntrospectFullSchema {
+              __schema {
+                queryType {
+                  name
+                  fields {
+                    name
+                    description
+                    args {
+                      name
+                      description
+                      type {
+                        name
+                        kind
+                        ofType {
+                          name
+                          kind
+                          inputFields {
+                            name
+                            type {
+                              name
+                              kind
+                              ofType {
+                                name
+                                kind
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                    type {
+                      name
+                      kind
+                      ofType {
+                        name
+                        fields {
+                          name
+                          type {
+                            name
+                            kind
+                            ofType {
+                              name
+                              kind
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                types {
+                  name
+                  kind
+                }
+              }
+            }
+          `;
+          
+          try {
+            const schema = await callMirosAPI(fullSchemaQuery, {});
+            
+            console.log('=== FULL Miros GraphQL Schema ===');
+            console.log('All Query fields:', schema.__schema?.queryType?.fields?.map(f => ({
+              name: f.name,
+              args: f.args?.map(a => ({ 
+                name: a.name, 
+                type: a.type?.ofType?.name || a.type?.name,
+                inputFields: a.type?.ofType?.inputFields?.map(f => ({ name: f.name, type: f.type?.ofType?.name || f.type?.name }))
+              })),
+              returnType: f.type?.ofType?.name || f.type?.name,
+              returnFields: f.type?.ofType?.fields?.map(f => f.name)
+            })));
+            console.log('All types:', schema.__schema?.types?.map(t => t.name).filter(Boolean));
+            
+            // Get AutocompleteSuggestionsPage type fields - THIS IS CRITICAL
+            const autocompletePageType = schema.__schema?.queryType?.fields?.find(f => f.name === 'autocompleteSuggestionsPage');
+            if (autocompletePageType) {
+              const returnTypeName = autocompletePageType.type?.ofType?.name;
+              console.log('=== AutocompleteSuggestionsPage Type ===');
+              console.log('Return type:', returnTypeName);
+              console.log('Available fields:', autocompletePageType.type?.ofType?.fields?.map(f => f.name));
+              console.log('Query args:', autocompletePageType.args);
+              if (autocompletePageType.args?.[2]?.type?.ofType?.inputFields) {
+                console.log('AutocompleteSuggestionsQuery input fields:', autocompletePageType.args[2].type.ofType.inputFields.map(f => ({
+                  name: f.name,
+                  type: f.type?.ofType?.name || f.type?.name
+                })));
+              }
+              
+              // Store the actual available fields for later use
+              autocompletePageType._actualFields = autocompletePageType.type?.ofType?.fields?.map(f => f.name) || [];
+            }
+            
+            // Try to find item-related queries
+            const itemQueries = schema.__schema?.queryType?.fields?.filter(f => 
+              f.name?.toLowerCase().includes('item') || 
+              f.name?.toLowerCase().includes('recommendation') ||
+              f.name?.toLowerCase().includes('search') ||
+              f.name?.toLowerCase().includes('suggestion')
+            );
+            console.log('Item/Recommendation/Search related queries:', itemQueries);
+            
+            return schema;
+          } catch (error) {
+            console.error('Failed to introspect schema:', error);
+            return null;
+          }
+        }
+
+        // Transform Miros result / scraped item to table format
+        function transformMirosResult(item) {
+          return {
+            productTitle: item.productTitle || item.title || item.name || item.productTitle || '-',
+            optionId: item.optionId || item.option_id || item.itemId || item.item_id || '-',
+            colourVariantId:
+              item.colourVariantId ||
+              item.colour_variant_id ||
+              item.colourVariantID ||
+              item.colour_variantID ||
+              '-',
+            url: item.url || item.productUrl || item.product_url || item.uri || '',
+            superCategory: item.superCategory || item.super_category || item.category || '-',
+            department: item.department || item.cpDepartment || item.cp_department || item.departmentName || '-',
+            keySection: item.keySection || item.cpKeySection || item.cp_key_section || item.section || '-',
+            preferredCategory:
+              item.preferredCategory ||
+              item.cpPrefCategory ||
+              item.cp_pref_category ||
+              item.prefCategory ||
+              '-',
+          };
+        }
+
+        // Scrape Miros overlay DOM and fill our table
+        async function scrapeMirosOverlayIntoTable() {
+          console.log('=== Starting Miros overlay scraping ===');
+          
+          // SIMPLIFIED: Find the overlay/modal directly
+          let container = null;
+          
+          // Method 1: Look for visible dialog/modal (most common)
+          const visibleDialogs = Array.from(document.querySelectorAll('[role="dialog"], .modal, [class*="modal"], [class*="overlay"]'))
+            .filter(d => {
+              const style = window.getComputedStyle(d);
+              return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+            });
+          
+          if (visibleDialogs.length > 0) {
+            container = visibleDialogs[0];
+            console.log('Found visible dialog/modal:', container.id || container.className);
+          }
+          
+          // Method 2: Look for Miros-specific containers
+          if (!container) {
+            const mirosContainers = [
+              '#miros-recommendations',
+              '[id*="miros-recommendations"]',
+              '[id*="miros"][id*="overlay"]',
+              '[id*="miros"][id*="modal"]',
+              '[class*="miros-overlay"]',
+              '[class*="miros-modal"]',
+            ];
+            
+            for (const selector of mirosContainers) {
+              const el = document.querySelector(selector);
+              if (el) {
+                container = el;
+                console.log('Found Miros container:', selector);
+                break;
+              }
+            }
+          }
+          
+          // Method 3: Fallback to body
+          if (!container) {
+            container = document.body;
+            console.log('Using document.body as container');
+          }
+
+          // SIMPLIFIED: Find product images (they're the most reliable indicator)
+          const allImages = container.querySelectorAll('img[src]');
+          console.log(`Found ${allImages.length} images in container`);
+          
+          // Filter to product images (exclude logos, icons, small images)
+          const productImages = Array.from(allImages).filter(img => {
+            const src = img.src || img.getAttribute('src') || '';
+            const alt = img.alt || '';
+            const width = img.naturalWidth || img.width || 0;
+            const height = img.naturalHeight || img.height || 0;
+            
+            // Exclude very small images (likely icons)
+            if (width > 0 && width < 100) return false;
+            if (height > 0 && height < 100) return false;
+            
+            // Exclude logos and icons
+            if (alt.toLowerCase().includes('logo') || alt.toLowerCase().includes('icon')) return false;
+            if (src.includes('logo') || src.includes('icon')) return false;
+            
+            // Must be in a card-like container or have meaningful parent
+            const parent = img.closest('[role="listitem"], [class*="card"], [class*="item"], a');
+            if (!parent) return false;
+            
+            // Must have some text nearby (product title)
+            const hasText = parent.textContent && parent.textContent.trim().length > 10;
+            
+            return hasText;
+          });
+          
+          console.log(`Filtered to ${productImages.length} product images`);
+          
+          if (productImages.length === 0) {
+            console.warn('No product images found. Trying to find product links directly...');
+            // Fallback: try to find product links
+            const productLinks = container.querySelectorAll('a[href*="/p/"]');
+            const validLinks = Array.from(productLinks).filter(link => {
+              const href = link.href || link.getAttribute('href') || '';
+              return href.includes('/p/') && href.includes('centrepointstores.com');
+            });
+            
+            if (validLinks.length > 0) {
+              console.log(`Found ${validLinks.length} product links, using those`);
+              // Convert links to "cards" for processing
+              const items = validLinks.map(link => {
+                const img = link.querySelector('img[src]');
+                const text = link.textContent?.trim() || img?.alt || '';
+                const url = link.href || link.getAttribute('href') || '';
+                const match = url.match(/\/p\/(\d+)/);
+                const optionId = match ? match[1] : '-';
+                
+                return {
+                  productTitle: text.length > 10 ? text.substring(0, 150) : 'Product',
+                  optionId: optionId,
+                  colourVariantId: '-',
+                  url: url,
+                  superCategory: '-',
+                  department: '-',
+                  keySection: '-',
+                  preferredCategory: '-',
+                };
+              });
+              
+              if (items.length > 0) {
+                renderResults(items);
+                return true;
+              }
+            }
+            
+            console.error('No products found at all. Container:', container.id || container.className);
+            return false;
+          }
+
+          console.log(`Processing ${productImages.length} product cards`);
+          
+          // Helper function to extract URL from modal after clicking (async)
+          const extractUrlFromModal = async (card, productContainer) => {
+            return new Promise((resolve) => {
+              // Try clicking the card to open modal
+              try {
+                card.click();
+                
+                // Wait for modal to appear
+                setTimeout(() => {
+                  // Look for "View details" button in modal
+                  const modal = document.querySelector('[role="dialog"], .modal, [class*="modal"], [class*="overlay"]');
+                  if (modal) {
+                    const viewDetailsBtn = Array.from(modal.querySelectorAll('button, a')).find(btn => {
+                      const text = btn.textContent?.toLowerCase() || '';
+                      return text.includes('view details');
+                    });
+                    
+                    if (viewDetailsBtn) {
+                      const url = viewDetailsBtn.href || 
+                                 viewDetailsBtn.getAttribute('href') ||
+                                 viewDetailsBtn.getAttribute('data-href') ||
+                                 '';
+                      if (url && url.includes('/p/')) {
+                        // Close modal
+                        const closeBtn = modal.querySelector('[aria-label*="close" i], [class*="close"], button[aria-label*="×"]');
+                        if (closeBtn) closeBtn.click();
+                        resolve(url);
+                        return;
+                      }
+                    }
+                    
+                    // Close modal if we opened it
+                    const closeBtn = modal.querySelector('[aria-label*="close" i], [class*="close"], button[aria-label*="×"]');
+                    if (closeBtn) closeBtn.click();
+                  }
+                  resolve('');
+                }, 500);
+              } catch (e) {
+                resolve('');
+              }
+            });
+          };
+
+          // Extract data from product images
+          const items = productImages.map((productImg, index) => {
+            // Find the card container (parent with the most info)
+            const card = productImg.closest('[role="listitem"], [class*="card"], [class*="item"], a') || productImg.parentElement;
+            // Find the actual product container
+            let productContainer = card.closest('[role="listitem"], [class*="card"], [class*="item"]') || card;
+            
+            // Use the product image we already found
+            const img = productImg;
+            
+            // Find product title element (the red highlighted box)
+            // Try common title selectors - look for the main text in the card
+            let titleEl = null;
+            const titleSelectors = [
+              'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+              '[class*="title"]',
+              '[class*="product-title"]',
+              '[class*="name"]',
+              '[data-title]',
+              'p[class*="title"]',
+              'span[class*="title"]',
+              'div[class*="title"]'
+            ];
+            
+            for (const selector of titleSelectors) {
+              titleEl = productContainer.querySelector(selector) || card.querySelector(selector);
+              if (titleEl && titleEl.textContent && titleEl.textContent.trim().length > 10) {
+                break;
+              }
+            }
+            
+            // If no title element found, look for the longest text node that's not price/brand/button text
+            if (!titleEl || !titleEl.textContent || titleEl.textContent.trim().length < 10) {
+              const allTextElements = productContainer.querySelectorAll('p, span, div, a, h1, h2, h3, h4, h5, h6');
+              let longestText = '';
+              for (const el of allTextElements) {
+                const text = el.textContent?.trim() || '';
+                // Skip if it's too short, is a price (AED/$, numbers), or is button text
+                if (text.length > longestText.length && 
+                    text.length > 10 && 
+                    text.length < 200 &&
+                    !text.match(/^AED\s*\d+/) &&
+                    !text.match(/^\$\d+/) &&
+                    !text.match(/^\d+$/) &&
+                    !text.toLowerCase().includes('view details') &&
+                    !text.toLowerCase().includes('add to') &&
+                    !text.toLowerCase().includes('basket') &&
+                    !text.toLowerCase().includes('cart')) {
+                  longestText = text;
+                  titleEl = el;
+                }
+              }
+            }
+            
+            // Extract product title from title element
+            let productTitle = '-';
+            if (titleEl && titleEl.textContent) {
+              productTitle = titleEl.textContent.trim();
+              // Clean up title - remove price, brand prefixes if they're in the same text
+              productTitle = productTitle
+                .replace(/AED\s*\d+.*$/i, '')
+                .replace(/^\$\d+.*$/i, '')
+                .replace(/^\d+.*$/i, '')
+                .trim();
+            }
+            
+            // Fallback to image alt text
+            if ((productTitle === '-' || productTitle.length < 10) && img) {
+              const alt = img.getAttribute('alt') || '';
+              if (alt && alt.length > 10) {
+                productTitle = alt.trim();
+              }
+            }
+            
+            // Find product URL - look for "View details" link or product link
+            let url = '';
+            
+            // Method 1: Look for buttons/links with "View details" text (case insensitive)
+            const allButtons = productContainer.querySelectorAll('button, a');
+            for (const btn of allButtons) {
+              const text = btn.textContent?.toLowerCase() || '';
+              if (text.includes('view details') || text.includes('view') && text.includes('details')) {
+                url = btn.href || 
+                      btn.getAttribute('href') ||
+                      btn.getAttribute('data-href') ||
+                      btn.getAttribute('onclick')?.match(/href['"]?\s*[:=]\s*['"]([^'"]+)/)?.[1] ||
+                      '';
+                if (url && url.includes('/p/')) {
+                  break;
+                }
+              }
+            }
+            
+            // Method 2: Look for any link/button with /p/ pattern in the card
+            if (!url || !url.includes('/p/')) {
+              const viewDetailsLink = productContainer.querySelector('a[href*="/p/"], button[data-href*="/p/"], a[href*="centrepointstores.com"][href*="/p/"]') ||
+                                     card.querySelector('a[href*="/p/"], button[data-href*="/p/"]');
+              
+              if (viewDetailsLink) {
+                url = viewDetailsLink.href || 
+                      viewDetailsLink.getAttribute('href') ||
+                      viewDetailsLink.getAttribute('data-href') ||
+                      '';
+              }
+            }
+            
+            // Method 3: Check if card itself is a link or has data-url
+            if (!url || !url.includes('/p/')) {
+              if (card.tagName === 'A' && card.href && card.href.includes('/p/')) {
+                url = card.href;
+              } else {
+                url = card.getAttribute('href') ||
+                      card.getAttribute('data-url') ||
+                      card.getAttribute('data-href') ||
+                      card.getAttribute('data-product-url') ||
+                      productContainer.getAttribute('href') ||
+                      productContainer.getAttribute('data-url') ||
+                      productContainer.getAttribute('data-href') ||
+                      productContainer.getAttribute('data-product-url') ||
+                      '';
+              }
+            }
+            
+            // Method 4: Look for any link in the container with /p/ pattern
+            if (!url || !url.includes('/p/')) {
+              const allLinks = productContainer.querySelectorAll('a[href]');
+              for (const link of allLinks) {
+                const href = link.href || link.getAttribute('href') || '';
+                if (href.includes('/p/') && href.includes('centrepointstores.com')) {
+                  url = href;
+                  break;
+                }
+              }
+            }
+            
+            // Method 5: Check data attributes for product ID and construct URL
+            if (!url || !url.includes('/p/')) {
+              const productId = card.getAttribute('data-product-id') ||
+                               card.getAttribute('data-item-id') ||
+                               card.getAttribute('miros-data-id') ||
+                               card.getAttribute('data-id') ||
+                               productContainer.getAttribute('data-product-id') ||
+                               productContainer.getAttribute('data-item-id') ||
+                               productContainer.getAttribute('data-id');
+              
+              if (productId && productId.match(/^\d+$/)) {
+                url = `https://www.centrepointstores.com/ae/en/p/${productId}`;
+              }
+            }
+            
+            // Method 6: If still no URL, check if clicking is needed (but don't auto-click all at once - too disruptive)
+            // This will be handled separately if needed - for now, we'll extract what we can without clicking
+            
+            // Extract product ID from URL (/p/123456 format)
+            let optionId = '-';
+            if (url && url.includes('/p/')) {
+              const match = url.match(/\/p\/(\d+)/);
+              if (match && match[1]) {
+                optionId = match[1];
+              }
+            }
+            
+            // Try other ID sources if URL didn't work
+            if (optionId === '-') {
+              optionId = card.getAttribute('miros-data-id') || 
+                        card.getAttribute('data-miros-id') ||
+                        card.getAttribute('data-item-id') ||
+                        productContainer.getAttribute('miros-data-id') ||
+                        productContainer.getAttribute('data-miros-id') ||
+                        productContainer.getAttribute('data-item-id') ||
+                        '';
+              
+              // Exclude layout IDs
+              if (optionId && (optionId.includes('masonry') || optionId.includes('container') || optionId.includes('wrapper'))) {
+                optionId = '-';
+              }
+              
+              // If it's a number, use it
+              if (optionId && !optionId.match(/^\d+$/)) {
+                optionId = '-';
+              }
+            }
+
+            // Extract category info
+            const superCategory = 
+              card.getAttribute('data-category') || 
+              productContainer.getAttribute('data-category') ||
+              card.getAttribute('data-miros-category') ||
+              '-';
+            
+            const department = 
+              card.getAttribute('data-department') || 
+              productContainer.getAttribute('data-department') ||
+              '-';
+
+            // Log what we extracted for debugging
+            if (index < 3) {
+              console.log(`Product ${index + 1}:`, {
+                title: productTitle,
+                titleElement: titleEl?.tagName || 'none',
+                titleText: titleEl?.textContent?.substring(0, 50) || 'none',
+                optionId: optionId,
+                url: url,
+                hasImg: !!img,
+                imgSrc: img?.src?.substring(0, 50) || 'none'
+              });
+            }
+
+            return {
+              productTitle: productTitle || `Product ${index + 1}`,
+              optionId: optionId || `${index + 1}`,
+              colourVariantId: '-',
+              url: url || '-',
+              superCategory: superCategory,
+              department: department,
+              keySection: '-',
+              preferredCategory: '-',
+            };
+          });
+
+          console.log('Scraped items from Miros overlay:', items);
+          if (typeof renderResults === 'function' && items.length > 0) {
+            renderResults(items);
+            return true; // Success!
+          }
+          
+          return false; // No items found
+        }
+
+        // Extract product ID from URL format: .../p/1025360
+        function extractProductIdFromUrl(url) {
+          try {
+            const match = url.match(/\/p\/(\d+)/);
+            return match ? match[1] : null;
+          } catch (error) {
+            return null;
+          }
+        }
+
+        // Fetch results directly from Miros API (no popup)
+        async function fetchMirosResultsDirectly(type, options) {
+          const { url, itemId, query, category, limit = 15 } = options;
+          let mirosData = [];
+
+          // First, introspect schema to find available queries
+          const schema = await introspectMirosSchema();
+          const availableQueries = schema?.__schema?.queryType?.fields || [];
+
+          if (type === 'url') {
+            // Extract product name from URL for text search
+            // URL format: .../SPLASH-Striped-Sleeveless-Polo-Dress/p/1025360
+            // Extract the product name part before /p/
+            let urlQuery = url.split('/p/')[0].split('/').pop().replace(/-/g, ' ');
+            console.log('Extracted product name from URL for search:', urlQuery);
+
+            // Use autocompleteSuggestionsPage for URL-based search
+            const searchQuery = availableQueries.find(q => 
+              q.name === 'autocompleteSuggestionsPage'
+            );
+
+            if (!searchQuery) {
+              throw new Error('Autocomplete suggestions query not available');
+            }
+
+            const queryName = searchQuery.name;
+            const queryArg = searchQuery.args?.find(a => a.name === 'query');
+            const isInputObject = queryArg?.type?.ofType?.name === 'AutocompleteSuggestionsQuery';
+            
+            // Get actual fields available on AutocompleteSuggestionsPage
+            const returnType = searchQuery.type?.ofType;
+            const availableFields = returnType?.fields?.map(f => f.name) || [];
+            console.log('AutocompleteSuggestionsPage available fields:', availableFields);
+            
+            // Build query dynamically based on what fields actually exist
+            let fieldsToQuery = '';
+            
+            // Common patterns - try to find which one exists
+            if (availableFields.includes('edges')) {
+              fieldsToQuery = `
+                edges {
+                  node {
+                    itemId
+                    title
+                    url
+                    imageUrl
+                  }
+                }
+              `;
+            } else if (availableFields.includes('items')) {
+              fieldsToQuery = `
+                items {
+                  itemId
+                  title
+                  url
+                  imageUrl
+                }
+              `;
+            } else if (availableFields.includes('nodes')) {
+              fieldsToQuery = `
+                nodes {
+                  itemId
+                  title
+                  url
+                  imageUrl
+                }
+              `;
+            } else if (availableFields.includes('suggestions')) {
+              fieldsToQuery = `
+                suggestions {
+                  itemId
+                  title
+                  url
+                  imageUrl
+                }
+              `;
+            } else if (availableFields.includes('data')) {
+              fieldsToQuery = `
+                data {
+                  itemId
+                  title
+                  url
+                  imageUrl
+                }
+              `;
+            } else {
+              // If none of the common patterns exist, query ALL available fields
+              // This will help us see what's actually there
+              fieldsToQuery = availableFields.slice(0, 10).map(field => `
+                ${field}
+              `).join('');
+              console.warn('Using all available fields:', availableFields.slice(0, 10));
+            }
+            
+            // autocompleteSuggestionsPage expects AutocompleteSuggestionsQuery input object, not String
+            const queryStr = `
+              query AutocompleteSuggestions($integration_id: ID!, $slot: Int!, $query: AutocompleteSuggestionsQuery!) {
+                ${queryName}(integration_id: $integration_id, slot: $slot, query: $query) {
+                  ${fieldsToQuery}
+                }
+              }
+            `;
+
+            // AutocompleteSuggestionsQuery is an input object - need to pass object with text/q field
+            const variables = {
+              integration_id: MIROS_INTEGRATION_ID,
+              slot: MIROS_SLOT,
+              query: { text: urlQuery } // Try 'text' field first
+            };
+
+            try {
+              let data;
+              try {
+                data = await callMirosAPI(queryStr, variables);
+              } catch (error) {
+                // Try with 'q' field if 'text' fails
+                if (variables.query.text) {
+                  variables.query = { q: urlQuery };
+                  data = await callMirosAPI(queryStr, variables);
+                } else {
+                  throw error;
+                }
+              }
+              
+              // autocompleteSuggestionsPage might return edges/nodes or items
+              const results = data[queryName];
+              if (results?.edges && Array.isArray(results.edges)) {
+                mirosData = results.edges.map(e => e.node).filter(Boolean);
+              } else if (results?.items && Array.isArray(results.items)) {
+                mirosData = results.items;
+              } else if (results?.nodes && Array.isArray(results.nodes)) {
+                mirosData = results.nodes;
+              } else if (Array.isArray(results)) {
+                mirosData = results;
+              } else if (results && typeof results === 'object') {
+                mirosData = results.data || results.results || [];
+              }
+            } catch (error) {
+              console.error('URL search query failed:', error);
+              throw error;
+            }
+
+          } else if (type === 'item') {
+            // For item/SKU search, use autocompleteSuggestionsPage with the itemId as query
+            const searchQuery = availableQueries.find(q => 
+              q.name === 'autocompleteSuggestionsPage'
+            );
+
+            if (!searchQuery) {
+              throw new Error('Autocomplete suggestions query not available');
+            }
+
+            const queryName = searchQuery.name;
+            
+            // Get actual fields available on AutocompleteSuggestionsPage
+            const returnType = searchQuery.type?.ofType;
+            const availableFields = returnType?.fields?.map(f => f.name) || [];
+            console.log('AutocompleteSuggestionsPage available fields:', availableFields);
+            
+            // Build query dynamically based on what fields actually exist
+            let fieldsToQuery = '';
+            if (availableFields.includes('edges')) {
+              fieldsToQuery = `edges { node { itemId title url imageUrl } }`;
+            } else if (availableFields.includes('items')) {
+              fieldsToQuery = `items { itemId title url imageUrl }`;
+            } else if (availableFields.includes('nodes')) {
+              fieldsToQuery = `nodes { itemId title url imageUrl }`;
+            } else if (availableFields.includes('suggestions')) {
+              fieldsToQuery = `suggestions { itemId title url imageUrl }`;
+            } else {
+              // Query all available fields to see structure
+              fieldsToQuery = availableFields.slice(0, 10).join(' ');
+              console.warn('Using all available fields:', availableFields.slice(0, 10));
+            }
+            
+            const queryStr = `
+              query AutocompleteSuggestions($integration_id: ID!, $slot: Int!, $query: AutocompleteSuggestionsQuery!) {
+                ${queryName}(integration_id: $integration_id, slot: $slot, query: $query) {
+                  ${fieldsToQuery}
+                }
+              }
+            `;
+
+            const variables = {
+              integration_id: MIROS_INTEGRATION_ID,
+              slot: MIROS_SLOT,
+              query: { text: itemId }
+            };
+
+            try {
+              let data;
+              try {
+                data = await callMirosAPI(queryStr, variables);
+              } catch (error) {
+                variables.query = { q: itemId };
+                data = await callMirosAPI(queryStr, variables);
+              }
+              
+              const results = data[queryName];
+              if (results?.edges && Array.isArray(results.edges)) {
+                mirosData = results.edges.map(e => e.node).filter(Boolean);
+              } else if (results?.items && Array.isArray(results.items)) {
+                mirosData = results.items;
+              } else if (results?.nodes && Array.isArray(results.nodes)) {
+                mirosData = results.nodes;
+              } else if (Array.isArray(results)) {
+                mirosData = results;
+              } else if (results && typeof results === 'object') {
+                mirosData = results.data || results.results || [];
+              }
+            } catch (error) {
+              console.error('Item search query failed:', error);
+              throw error;
+            }
+
+          } else if (type === 'nlp') {
+            // Find autocompleteSuggestionsPage query (this is what's available)
+            const searchQuery = availableQueries.find(q => 
+              q.name === 'autocompleteSuggestionsPage'
+            );
+
+            if (!searchQuery) {
+              // If no search query exists, we might need to use widget or different approach
+              throw new Error('Search query not available in GraphQL schema. You may need to use the Miros widget or check API documentation.');
+            }
+
+            const queryName = searchQuery.name;
+            const args = searchQuery.args || [];
+            
+            console.log(`Using search query: ${queryName} with args:`, args.map(a => a.name));
+
+            // Get actual fields available on AutocompleteSuggestionsPage
+            const returnType = searchQuery.type?.ofType;
+            const availableFields = returnType?.fields?.map(f => f.name) || [];
+            console.log('AutocompleteSuggestionsPage available fields:', availableFields);
+            
+            // Build query dynamically based on what fields actually exist
+            let fieldsToQuery = '';
+            if (availableFields.includes('edges')) {
+              fieldsToQuery = `edges { node { itemId title url imageUrl } }`;
+            } else if (availableFields.includes('items')) {
+              fieldsToQuery = `items { itemId title url imageUrl }`;
+            } else if (availableFields.includes('nodes')) {
+              fieldsToQuery = `nodes { itemId title url imageUrl }`;
+            } else if (availableFields.includes('suggestions')) {
+              fieldsToQuery = `suggestions { itemId title url imageUrl }`;
+            } else {
+              // Query all available fields to see structure
+              fieldsToQuery = availableFields.slice(0, 10).join(' ');
+              console.warn('Using all available fields:', availableFields.slice(0, 10));
+            }
+            
+            // autocompleteSuggestionsPage requires: integration_id, slot, query (AutocompleteSuggestionsQuery input object)
+            const queryStr = `
+              query AutocompleteSuggestions($integration_id: ID!, $slot: Int!, $query: AutocompleteSuggestionsQuery!) {
+                ${queryName}(integration_id: $integration_id, slot: $slot, query: $query) {
+                  ${fieldsToQuery}
+                }
+              }
+            `;
+
+            const variables = {
+              integration_id: MIROS_INTEGRATION_ID,
+              slot: MIROS_SLOT,
+              query: { text: query } // AutocompleteSuggestionsQuery is an input object
+            };
+
+            try {
+              let data;
+              try {
+                data = await callMirosAPI(queryStr, variables);
+              } catch (error) {
+                // Try with 'q' field if 'text' fails
+                variables.query = { q: query };
+                data = await callMirosAPI(queryStr, variables);
+              }
+              
+              // autocompleteSuggestionsPage might return edges/nodes or items
+              const results = data[queryName];
+              if (results?.edges && Array.isArray(results.edges)) {
+                mirosData = results.edges.map(e => e.node).filter(Boolean);
+              } else if (results?.items && Array.isArray(results.items)) {
+                mirosData = results.items;
+              } else if (results?.nodes && Array.isArray(results.nodes)) {
+                mirosData = results.nodes;
+              } else if (Array.isArray(results)) {
+                mirosData = results;
+              } else if (results && typeof results === 'object') {
+                mirosData = results.data || results.results || [];
+              }
+            } catch (error) {
+              console.error('Autocomplete suggestions query failed:', error);
+              throw error;
+            }
+          }
+
+          return mirosData.slice(0, limit).map(transformMirosResult);
+        }
+
+        // Helper to extract items from various Miros response structures
+        function extractItemsFromMirosResponse(data) {
+          // Try different possible response structures
+          if (data.autocompleteSuggestionsPage) {
+            const page = data.autocompleteSuggestionsPage;
+            return page.edges?.map(e => e.node) || 
+                   page.items || 
+                   page.nodes || 
+                   page.suggestions || 
+                   [];
+          }
+          if (data.search) {
+            return Array.isArray(data.search) ? data.search : [];
+          }
+          if (data.itemRecommendations) {
+            return Array.isArray(data.itemRecommendations) ? data.itemRecommendations : [];
+          }
+          return [];
+        }
+
+        // Listen for Miros widget events and extract results
+        function setupMirosWidgetListener() {
+          // Method 1: Listen for custom events from widget
+          window.addEventListener('miros-results-loaded', (event) => {
+            if (event.detail && event.detail.items) {
+              const items = event.detail.items.map(item => ({
+                productTitle: item.title || item.name || '-',
+                optionId: item.optionId || item.option_id || '-',
+                colourVariantId: item.colourVariantId || item.colour_variant_id || '-',
+                url: item.url || item.productUrl || item.product_url || '',
+                superCategory: item.superCategory || item.super_category || '-',
+                department: item.department || item.cpDepartment || item.cp_department || '-',
+                keySection: item.keySection || item.cpKeySection || item.cp_key_section || '-',
+                preferredCategory: item.preferredCategory || item.cpPrefCategory || item.cp_pref_category || '-',
+              }));
+              renderResults(items);
+              clearStatus();
+            }
+          });
+
+          // Method 2: Intercept network requests to capture widget's API responses
+          const originalFetch = window.fetch;
+          window.fetch = function(...args) {
+            const url = args[0];
+            if (typeof url === 'string' && url.includes('miros.services')) {
+              return originalFetch.apply(this, args).then(response => {
+                const clonedResponse = response.clone();
+                clonedResponse.json().then(data => {
+                  if (data && data.data) {
+                    // Try to extract items from various response structures
+                    const items = extractItemsFromMirosResponse(data.data);
+                    if (items && items.length > 0) {
+                      console.log('Captured items from widget API:', items);
+                      const transformed = items.map(transformMirosResult);
+                      renderResults(transformed);
+                      clearStatus();
+                    }
+                  }
+                }).catch(() => {});
+                return response;
+              });
+            }
+            return originalFetch.apply(this, args);
+          };
+
+          // Method 3: Use MutationObserver to watch widget DOM for results
+          const observer = new MutationObserver((mutations) => {
+            // Look for product elements in the widget overlay
+            const widgetOverlay = document.querySelector('[data-miros-overlay], .miros-overlay, .miros-container, [id*="miros"]');
+            if (widgetOverlay) {
+              const productElements = widgetOverlay.querySelectorAll('[data-item-id], [data-product-id], .product-item, .suggestion-item, [data-suggestion]');
+              if (productElements.length > 0) {
+                const items = Array.from(productElements).map(el => {
+                  const titleEl = el.querySelector('.title, .product-title, [data-title], h3, h4');
+                  const linkEl = el.querySelector('a');
+                  
+                  return {
+                    productTitle: titleEl?.textContent?.trim() || el.getAttribute('data-title') || el.getAttribute('alt') || '-',
+                    optionId: el.getAttribute('data-item-id') || el.getAttribute('data-option-id') || el.getAttribute('data-product-id') || '-',
+                    colourVariantId: el.getAttribute('data-colour-variant-id') || '-',
+                    url: linkEl?.href || el.getAttribute('data-url') || el.getAttribute('href') || '',
+                    superCategory: el.getAttribute('data-category') || el.closest('[data-category]')?.getAttribute('data-category') || '-',
+                    department: el.getAttribute('data-department') || '-',
+                    keySection: '-',
+                    preferredCategory: '-',
+                  };
+                });
+                if (items.length > 0) {
+                  console.log('Extracted items from widget DOM:', items);
+                  renderResults(items);
+                  clearStatus();
+                }
+              }
+            }
+          });
+
+          // Observe the document for widget changes
+          observer.observe(document.body, {
+            childList: true,
+            subtree: true
+          });
+        }
+
+        // Function to extract results from widget
+        function tryExtractResultsFromWidget() {
+          // Method 1: Check if widget exposes global API
+          if (window.MirosWidget || window.miros) {
+            const widget = window.MirosWidget || window.miros;
+            if (widget && typeof widget.getResults === 'function') {
+              widget.getResults().then(items => {
+                if (items && items.length > 0) {
+                  const transformed = items.map(transformMirosResult);
+                  renderResults(transformed);
+                  clearStatus();
+                  return;
+                }
+              }).catch(() => {});
+            }
+            
+            // Try other possible methods
+            if (widget && typeof widget.getSuggestions === 'function') {
+              widget.getSuggestions().then(items => {
+                if (items && items.length > 0) {
+                  const transformed = items.map(transformMirosResult);
+                  renderResults(transformed);
+                  clearStatus();
+                }
+              }).catch(() => {});
+            }
+          }
+
+          // Method 2: Try to find results in DOM after a delay
+          setTimeout(() => {
+            const widgetOverlay = document.querySelector('[data-miros-overlay], .miros-overlay, [id*="miros"], [class*="miros"]');
+            if (widgetOverlay) {
+              // Look for product cards/images in the widget
+              const productCards = widgetOverlay.querySelectorAll('img[src*="product"], .product-card, [data-product], [data-item-id]');
+              
+              if (productCards.length > 0) {
+                const items = Array.from(productCards).map(card => {
+                  const parent = card.closest('[data-item-id], [data-product-id], .product-item') || card.parentElement;
+                  return {
+                    productTitle: parent.querySelector('.title, .product-title, [data-title]')?.textContent?.trim() || card.getAttribute('alt') || '-',
+                    optionId: parent.getAttribute('data-item-id') || card.getAttribute('data-item-id') || '-',
+                    colourVariantId: '-',
+                    url: parent.querySelector('a')?.href || card.closest('a')?.href || '',
+                    superCategory: '-',
+                    department: '-',
+                    keySection: '-',
+                    preferredCategory: '-',
+                  };
+                });
+                
+                if (items.length > 0) {
+                  renderResults(items);
+                  clearStatus();
+                }
+              }
+            }
+          }, 1000);
+        }
+
+        // This helper sets data attributes so the Miros widget knows what to search for next.
+        const prepareEntry = (attributes) => {
+          if (!mirosEntry) return;
+
+          ENTRY_ATTRS.forEach((attr) => {
+            const attrName = `data-miros-${attr}`;
+            if (attributes[attr]) {
+              mirosEntry.setAttribute(attrName, attributes[attr]);
+            } else {
+              mirosEntry.removeAttribute(attrName);
+            }
+          });
+        };
+
+        // Helper to open Miros widget overlay
+        const openMirosOverlay = () => {
+          // The Miros widget injects an AI search button - we need to click that
+          // Try multiple selectors to find the AI button
+          const aiButton = 
+            document.querySelector('button.miros-search-on-entry-point') ||
+            document.querySelector('[class*="miros-search-on-entry-point"]') ||
+            document.querySelector('button[class*="miros"][class*="search"]') ||
+            document.querySelector('button[aria-label*="search" i]') ||
+            document.querySelector('[data-miros-entry="miros-on-search"] button') ||
+            document.querySelector('#mirosEntry button') ||
+            document.querySelector('button[class*="miros-box-border"]');
+          
+          if (aiButton) {
+            console.log('Found AI button, clicking it to open overlay');
+            aiButton.click();
+            return;
+          }
+          
+          // Fallback: try clicking mirosEntry or triggering event
+          if (mirosEntry) {
+            console.log('AI button not found, trying to click mirosEntry');
+            // Try multiple ways to trigger the overlay
+            mirosEntry.click();
+            mirosEntry.dispatchEvent(
+              new MouseEvent("click", {
+                bubbles: true,
+                cancelable: true,
+                view: window,
+              }),
+            );
+          } else {
+            console.warn('No mirosEntry found and no AI button found');
+          }
+        };
+
+        // Upload image and get data URL (no backend needed - widget handles it)
+        const uploadImageToMiros = async (file) => {
+          return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            
+            reader.onload = (e) => {
+              const imageUrl = e.target.result; // Data URL
+              resolve({ imageUrl });
+            };
+            
+            reader.onerror = () => {
+              reject(new Error("Failed to read image file"));
+            };
+            
+            reader.readAsDataURL(file);
+          });
+        };
+
+        if (trigger && fileInput) {
+          trigger.addEventListener("click", () => {
+            clearStatus();
+            fileInput.click();
+          });
+
+          fileInput.addEventListener("change", async (event) => {
+            clearStatus();
+            const file = event.target.files?.[0];
+            if (!file) return;
+
+            try {
+              showStatus("Searching by image…", "pending");
+              const { imageUrl } = await uploadImageToMiros(file);
+              
+              // For image search, we'd need to use Miros image search API
+              // This is a placeholder - you may need to implement image upload endpoint
+              // or use Miros image search GraphQL mutation
+              showStatus("Image search not yet implemented via direct API. Please use text/SKU search.", "error");
+              
+              // TODO: Implement image search via Miros GraphQL if available
+              // Example: mutation { searchByImage(imageUrl: $imageUrl, limit: 15) { ... } }
+              
+            } catch (error) {
+              console.error(error);
+              showStatus(
+                "Unable to process image. Please try again.",
+                "error",
+              );
+            } finally {
+              fileInput.value = "";
+            }
+          });
+        }
+
+        if (searchBtn && searchInput) {
+          searchBtn.addEventListener("click", async () => {
+            clearStatus();
+            const rawValue = searchInput.value.trim();
+
+            if (!rawValue) {
+              showStatus("Enter a search term or SKU to continue.", "error");
+              return;
+            }
+
+            const isSku = /^[A-Za-z0-9_-]+$/.test(rawValue);
+            const attributes = {};
+
+            if (isSku) {
+              attributes.item = rawValue;
+              attributes.nlp = "";
+            } else {
+              // Treat URLs and text the same - as NLP query
+              attributes.item = "";
+              attributes.nlp = rawValue;
+              attributes.category = categorySelect?.value || "";
+            }
+
+            // Configure Miros widget with the current query
+            prepareEntry(attributes);
+
+            // Wait a bit for Miros widget to inject the AI button
+            showStatus("Opening Miros search...", "pending");
+            
+            // Try to find and click the AI button immediately, then retry if not found
+            const tryOpenOverlay = (attempt = 0) => {
+              const aiButton = 
+                document.querySelector('button.miros-search-on-entry-point') ||
+                document.querySelector('[class*="miros-search-on-entry-point"]') ||
+                document.querySelector('button[class*="miros"][class*="search"]') ||
+                document.querySelector('[data-miros-entry="miros-on-search"] button') ||
+                document.querySelector('#mirosEntry button');
+              
+              if (aiButton) {
+                console.log('Found AI button, clicking to open overlay');
+                aiButton.click();
+                
+                // Set up scraping after overlay opens
+                let observer = null;
+                let scrapeAttempts = 0;
+                const maxScrapeAttempts = 15; // Try for up to 15 seconds
+                const scrapeRetryInterval = 500; // Check every 500ms
+
+                const tryScraping = async () => {
+                  scrapeAttempts++;
+                  console.log(`Attempt ${scrapeAttempts}/${maxScrapeAttempts} to scrape overlay`);
+                  const success = await scrapeMirosOverlayIntoTable();
+                  
+                  if (success) {
+                    if (observer) observer.disconnect();
+                    showStatus("Results loaded successfully!", "info");
+                    setTimeout(() => clearStatus(), 2000);
+                  } else if (scrapeAttempts < maxScrapeAttempts) {
+                    // Keep trying
+                    showStatus(`Waiting for results... (${scrapeAttempts}/${maxScrapeAttempts})`, "pending");
+                    setTimeout(tryScraping, scrapeRetryInterval);
+                  } else {
+                    // Give up after max attempts
+                    if (observer) observer.disconnect();
+                    
+                    // Final attempt: log debug info
+                    console.error('Failed to find overlay after all attempts. Debug info:');
+                    console.log('All Miros elements:', document.querySelectorAll('[id*="miros"], [class*="miros"], [data-miros]'));
+                    console.log('All dialogs/modals:', document.querySelectorAll('[role="dialog"], .modal, [class*="overlay"]'));
+                    console.log('All links with /p/:', document.querySelectorAll('a[href*="/p/"]'));
+                    
+                    showStatus("Results not found. Check console for debug info.", "error");
+                    setTimeout(() => clearStatus(), 3000);
+                  }
+                };
+
+                // Use MutationObserver to detect when overlay appears
+                observer = new MutationObserver((mutations) => {
+                  // Check if any new Miros elements appeared
+                  const hasNewMirosElements = mutations.some(mutation => {
+                    return Array.from(mutation.addedNodes).some(node => {
+                      if (node.nodeType !== 1) return false; // Not an element
+                      return node.querySelector && (
+                        node.querySelector('[id*="miros"], [class*="miros"], [data-miros]') ||
+                        node.id?.includes('miros') ||
+                        node.className?.includes('miros')
+                      );
+                    });
+                  });
+                  
+                  if (hasNewMirosElements) {
+                    console.log('Detected new Miros elements, attempting to scrape...');
+                    setTimeout(() => tryScraping(), 300); // Small delay to let DOM settle
+                  }
+                });
+
+                // Start observing
+                observer.observe(document.body, {
+                  childList: true,
+                  subtree: true,
+                  attributes: false
+                });
+
+                // Also start polling after initial delay (backup method)
+                setTimeout(tryScraping, 500);
+                
+              } else if (attempt < 10) {
+                // Widget might still be loading, try again
+                setTimeout(() => tryOpenOverlay(attempt + 1), 200);
+              } else {
+                // Fallback to old method
+                console.warn('AI button not found after retries, using fallback');
+                openMirosOverlay();
+              }
+            };
+            
+            tryOpenOverlay();
+          });
+        }
+
+        if (clearResultsBtn) {
+          clearResultsBtn.addEventListener("click", () => {
+            clearStatus();
+            clearResults();
+          });
+        }
+
+        // Initialize widget listener when page loads
+        setupMirosWidgetListener();
+      })();
+    </script>
+    
+  </body>
+</html>
+
+

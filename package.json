@@ -1,0 +1,20 @@
+{
+  "name": "miros-poc-backend",
+  "version": "1.0.0",
+  "description": "Backend server for Miros POC - handles API requests and communicates with Miros API",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": ["miros", "api", "backend"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "node-fetch": "^2.7.0"
+  }
+}
+
