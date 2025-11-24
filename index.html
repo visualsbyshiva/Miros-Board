@@ -3,20 +3,46 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Collection Builder Dashboard</title>
+    <title>Smart Product Recommendations</title>
     <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <script type="module" src="https://content.miros.services/frontend/public/main/container/assets/container.bundle.js" data-miros-integration-id="fb97f7d4-fe95-402f-a81a-402cb062eaa3"></script>
   </head>
   <body>
+    <div class="focus-overlay" id="focusOverlay"></div>
     <main class="dashboard">
-      <header class="dashboard__header">
+      <header class="dashboard__header" id="dashboardHeader">
+        <div class="dashboard__header-content">
+          <div class="dashboard__header-title">
+            <h1 class="dashboard__title">Smart Product Recommendations</h1>
+            <p class="dashboard__subtitle">Paste a link, SKU, or product name to find similar items</p>
+          </div>
+          <div class="dashboard__search-container">
+            <div class="dashboard__input-wrapper">
         <input
           type="text"
           class="dashboard__input"
           id="searchInput"
-          placeholder="Enter search term or SKU"
-          aria-label="Enter search term or SKU"
-        />
+                placeholder="Paste a Product URL, SKU or a Product Attribute"
+                aria-label="Enter search term, SKU, or paste product URL"
+              />
+            </div>
+            <div class="dashboard__search-controls">
+              <div class="dashboard__search-controls-left">
+                <button
+                  type="button"
+                  class="dashboard__button dashboard__button--image-icon"
+                  id="uploadTrigger"
+                  aria-label="Upload Image"
+                  title="Upload Image"
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <g transform="translate(3.5, 3.5)">
+                      <path d="M1.80775 17C1.30258 17 0.875 16.825 0.525 16.475C0.175 16.125 0 15.6974 0 15.1923V1.80775C0 1.30258 0.175 0.875 0.525 0.525C0.875 0.175 1.30258 0 1.80775 0H8.55775C8.77025 0 8.94833 0.0719168 9.092 0.21575C9.23583 0.359583 9.30775 0.53775 9.30775 0.75025C9.30775 0.962917 9.23583 1.141 9.092 1.2845C8.94833 1.42817 8.77025 1.5 8.55775 1.5H1.80775C1.71792 1.5 1.64417 1.52883 1.5865 1.5865C1.52883 1.64417 1.5 1.71792 1.5 1.80775V15.1923C1.5 15.2821 1.52883 15.3558 1.5865 15.4135C1.64417 15.4712 1.71792 15.5 1.80775 15.5H15.1923C15.2821 15.5 15.3558 15.4712 15.4135 15.4135C15.4712 15.3558 15.5 15.2821 15.5 15.1923V8.44225C15.5 8.22975 15.5719 8.05167 15.7158 7.908C15.8596 7.76417 16.0378 7.69225 16.2502 7.69225C16.4629 7.69225 16.641 7.76417 16.7845 7.908C16.9282 8.05167 17 8.22975 17 8.44225V15.1923C17 15.6974 16.825 16.125 16.475 16.475C16.125 16.825 15.6974 17 15.1923 17H1.80775ZM2.88475 13.1923H14.1152L10.625 8.5385L7.625 12.4327L5.5 9.73075L2.88475 13.1923ZM13.5 3.5H12.25C12.0375 3.5 11.8593 3.42808 11.7155 3.28425C11.5718 3.14042 11.5 2.96225 11.5 2.74975C11.5 2.53708 11.5718 2.359 11.7155 2.2155C11.8593 2.07183 12.0375 2 12.25 2H13.5V0.75C13.5 0.5375 13.5719 0.359417 13.7158 0.21575C13.8596 0.0719168 14.0378 0 14.2503 0C14.4629 0 14.641 0.0719168 14.7845 0.21575C14.9282 0.359417 15 0.5375 15 0.75V2H16.25C16.4625 2 16.6406 2.07192 16.7843 2.21575C16.9281 2.35958 17 2.53775 17 2.75025C17 2.96292 16.9281 3.141 16.7843 3.2845C16.6406 3.42817 16.4625 3.5 16.25 3.5H15V4.75C15 4.9625 14.9281 5.14067 14.7843 5.2845C14.6404 5.42817 14.4622 5.5 14.2498 5.5C14.0371 5.5 13.859 5.42817 13.7155 5.2845C13.5718 5.14067 13.5 4.9625 13.5 4.75V3.5Z" fill="#1C1B1F"/>
+                    </g>
+                  </svg>
+                </button>
+                <div class="dashboard__category-wrapper">
         <select
           class="dashboard__select"
           id="categorySelect"
@@ -28,9 +54,27 @@
           <option value="Accessories">Accessories</option>
           <option value="Footwear">Footwear</option>
         </select>
-        <button type="button" class="dashboard__button" id="uploadTrigger">
-          Upload Image
+                </div>
+              </div>
+              <button
+                type="button"
+                class="dashboard__button dashboard__button--search"
+                id="searchButton"
+                aria-label="Search"
+                title="Search"
+              >
+                <span>Search</span>
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M9 17C13.4183 17 17 13.4183 17 9C17 4.58172 13.4183 1 9 1C4.58172 1 1 4.58172 1 9C1 13.4183 4.58172 17 9 17Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M19 19L14.65 14.65" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
         </button>
+              <div
+                id="mirosEntry"
+                data-miros-entry="miros-on-search"
+                aria-hidden="true"
+              ></div>
+            </div>
         <input
           type="file"
           id="uploadInput"
@@ -38,31 +82,16 @@
           hidden
           aria-hidden="true"
         />
-        <button
-          type="button"
-          class="dashboard__button dashboard__button--primary"
-          id="searchButton"
-        >
-          Search
-        </button>
-        <div
-          id="mirosEntry"
-          data-miros-entry="miros-on-search"
-          aria-hidden="true"
-        ></div>
+          </div>
+        </div>
       </header>
       <p class="dashboard__status" id="statusMessage" aria-live="polite"></p>
-      <section class="dashboard__results">
+      <section class="dashboard__results" id="dashboardResults">
         <div class="results-card">
-          <div class="results-card__header">
-            <div>
-              <h1 class="results-card__title">
-                Search Results for Similar Products Recommendation
-              </h1>
-              <p class="results-card__subtitle">
-                Showing up to the top 12 matched items from Miros
-              </p>
-            </div>
+          <div class="results-summary" id="resultsSummary">
+            <span class="results-summary__text" id="resultsSummaryText">
+              Enter a search term, SKU ID, or upload an image to see product-level recommendations here.
+            </span>
             <button
               type="button"
               class="dashboard__button dashboard__button--ghost"
@@ -70,10 +99,6 @@
             >
               Clear Results
             </button>
-          </div>
-          <div class="results-summary" id="resultsSummary">
-            Enter a search term, SKU ID, or upload an image to see product-level
-            recommendations here.
           </div>
           <div class="results-grid-wrapper" role="region" aria-live="polite">
             <table class="results-grid" id="resultsGrid">
@@ -100,8 +125,8 @@
           </div>
         </div>
       </section>
-      <footer class="dashboard__footer">
-        <button type="button" class="dashboard__button">Download</button>
+      <footer class="dashboard__footer" id="dashboardFooter">
+        <button type="button" class="dashboard__button dashboard__button--primary" id="downloadButton">Download Results</button>
       </footer>
     </main>
     <script>
@@ -114,8 +139,147 @@
         const mirosEntry = document.getElementById("mirosEntry");
         const statusMessage = document.getElementById("statusMessage");
         const resultsSummary = document.getElementById("resultsSummary");
+        const resultsSummaryText = document.getElementById("resultsSummaryText");
         const resultsBody = document.getElementById("resultsBody");
         const clearResultsBtn = document.getElementById("clearResultsButton");
+        const downloadButton = document.getElementById("downloadButton");
+        const dashboardResults = document.getElementById("dashboardResults");
+        const dashboardHeader = document.getElementById("dashboardHeader");
+        const focusOverlay = document.getElementById("focusOverlay");
+
+        // State management
+        let hasSearched = false;
+        let isFocusMode = false;
+
+        // STATE 1: Initial State - hide results on first load
+        if (dashboardResults) {
+          dashboardResults.style.display = 'none';
+        }
+        const footer = document.querySelector('.dashboard__footer');
+        if (footer) {
+          footer.style.display = 'none';
+        }
+
+        // Note: Search button handlers are set up later in performSearch section
+
+        // STATE 3: Focus Mode - when clicking search input after search
+        const enterFocusMode = () => {
+          if (!hasSearched) return; // Only work in STATE 2
+          
+          isFocusMode = true;
+          document.body.classList.add('focus-mode');
+          if (focusOverlay) {
+            focusOverlay.classList.add('active');
+          }
+          if (dashboardHeader) {
+            dashboardHeader.classList.add('focused');
+          }
+          if (dashboardResults) {
+            dashboardResults.classList.add('faded');
+          }
+          const footer = document.querySelector('.dashboard__footer');
+          if (footer) {
+            footer.classList.add('faded');
+          }
+        };
+
+        // Exit focus mode - return to STATE 2
+        const exitFocusMode = () => {
+          isFocusMode = false;
+          document.body.classList.remove('focus-mode');
+          if (focusOverlay) {
+            focusOverlay.classList.remove('active');
+          }
+          if (dashboardHeader) {
+            dashboardHeader.classList.remove('focused');
+          }
+          if (dashboardResults) {
+            dashboardResults.classList.remove('faded');
+          }
+          const footer = document.querySelector('.dashboard__footer');
+          if (footer) {
+            footer.classList.remove('faded');
+          }
+        };
+
+        // Show results section after first search - STATE 2: Searched State
+        const showResultsSection = () => {
+          if (hasSearched) return; // Already shown, don't duplicate
+          
+          hasSearched = true;
+          document.body.classList.add('has-results');
+          
+          if (dashboardResults) {
+            dashboardResults.style.display = 'flex';
+            // Force reflow to ensure display change takes effect
+            void dashboardResults.offsetHeight;
+            // Add visible class for animation
+            requestAnimationFrame(() => {
+              dashboardResults.classList.add('visible');
+            });
+          }
+          
+          const footer = document.querySelector('.dashboard__footer');
+          if (footer) {
+            footer.style.display = 'flex';
+            requestAnimationFrame(() => {
+              footer.classList.add('visible');
+            });
+          }
+          
+          // Exit focus mode if active
+          exitFocusMode();
+        };
+
+        // Focus mode: click overlay to exit
+        if (focusOverlay) {
+          focusOverlay.addEventListener('click', (e) => {
+            if (isFocusMode && e.target === focusOverlay) {
+              exitFocusMode();
+              searchInput?.blur();
+            }
+          });
+        }
+
+        // Enter focus mode on search input focus (only after first search)
+        if (searchInput) {
+          searchInput.addEventListener('focus', () => {
+            if (hasSearched) {
+              enterFocusMode();
+            }
+          });
+
+          // Exit focus mode on blur
+          searchInput.addEventListener('blur', (e) => {
+            setTimeout(() => {
+              if (!document.activeElement || 
+                  (document.activeElement.id !== 'searchButton' && 
+                   document.activeElement.id !== 'uploadTrigger')) {
+                exitFocusMode();
+              }
+            }, 200);
+          });
+
+          // Auto-detect paste and trigger search
+          searchInput.addEventListener('paste', (e) => {
+            setTimeout(() => {
+              const pastedValue = searchInput.value.trim();
+              if (pastedValue && (pastedValue.startsWith('http') || pastedValue.includes('/p/'))) {
+                // Auto-trigger search for URLs
+                if (searchBtn) {
+                  setTimeout(() => {
+                    searchBtn.click();
+                  }, 100);
+                }
+              }
+            }, 10);
+          });
+        }
+
+        // Exit focus mode when search button is clicked - returns to STATE 2
+        const exitFocusOnSearch = () => {
+          exitFocusMode();
+        };
 
         const ENTRY_ATTRS = [
           "item",
@@ -142,15 +306,15 @@
 
         // This helper turns the raw number of hits into a short sentence kids can read.
         const summariseResults = (count) => {
-          if (!resultsSummary) return;
+          if (!resultsSummaryText) return;
 
           if (!count) {
-            resultsSummary.textContent =
+            resultsSummaryText.textContent =
               "No matches returned from Miros. Adjust filters or try another input.";
             return;
           }
 
-          resultsSummary.textContent = `${count} product${
+          resultsSummaryText.textContent = `${count} product${
             count === 1 ? "" : "s"
           } returned from Miros.`;
         };
@@ -161,10 +325,11 @@
             resultsBody.innerHTML =
               '<tr><td colspan="8" class="results-empty">Results cleared. Run a new search to see recommendations.</td></tr>';
           }
-          if (resultsSummary) {
-            resultsSummary.textContent =
+          if (resultsSummaryText) {
+            resultsSummaryText.textContent =
               "Results cleared. Enter a new search term, SKU ID, or upload an image to refresh.";
           }
+          // Keep results section visible in STATE 2, just clear the data
         };
 
         // This helper builds the table rows so we can actually see the product cards.
@@ -175,6 +340,7 @@
             resultsBody.innerHTML =
               '<tr><td colspan="8" class="results-empty">No matching products found.</td></tr>';
             summariseResults(0);
+            // Results section already shown at start of search
             return;
           }
 
@@ -210,6 +376,11 @@
 
           resultsBody.innerHTML = rows.join("");
           summariseResults(items.length);
+          
+          // Results section already shown at start of search - just ensure it's visible
+          if (!hasSearched) {
+            showResultsSection();
+          }
         };
 
         // Miros API configuration - using Integration ID only (no API key)
@@ -222,20 +393,20 @@
           try {
             const response = await fetch(MIROS_API_URL, {
               method: 'POST',
-              headers: {
+            headers: {
                 'Content-Type': 'application/json',
                 'X-Integration-Id': MIROS_INTEGRATION_ID,
                 // Try without API key first - some integrations work with just Integration ID
-              },
+            },
               body: JSON.stringify({ query, variables }),
-            });
+          });
 
-            if (!response.ok) {
+          if (!response.ok) {
               const errorText = await response.text();
               throw new Error(`Miros API error (${response.status}): ${errorText}`);
-            }
+          }
 
-            const data = await response.json();
+          const data = await response.json();
 
             if (data.errors) {
               // If we get authentication errors, user might need API key
@@ -408,12 +579,20 @@
           // Method 1: Look for visible dialog/modal (most common)
           const visibleDialogs = Array.from(document.querySelectorAll('[role="dialog"], .modal, [class*="modal"], [class*="overlay"]'))
             .filter(d => {
+              // CRITICAL: Exclude our own focus overlay
+              if (d.id === 'focusOverlay' || d.classList.contains('focus-overlay')) {
+                return false;
+              }
               const style = window.getComputedStyle(d);
               return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
             });
           
           if (visibleDialogs.length > 0) {
-            container = visibleDialogs[0];
+            // Prefer dialogs that contain Miros elements or product links
+            const mirosDialog = visibleDialogs.find(d => 
+              d.querySelector('[id*="miros"], [class*="miros"], [data-miros], a[href*="/p/"]')
+            );
+            container = mirosDialog || visibleDialogs[0];
             console.log('Found visible dialog/modal:', container.id || container.className);
           }
           
@@ -429,16 +608,46 @@
             ];
             
             for (const selector of mirosContainers) {
-              const el = document.querySelector(selector);
-              if (el) {
-                container = el;
-                console.log('Found Miros container:', selector);
-                break;
+              const elements = document.querySelectorAll(selector);
+              for (const el of elements) {
+                // Exclude our own elements
+                if (el.id === 'focusOverlay' || el.classList.contains('focus-overlay')) continue;
+                
+                const style = window.getComputedStyle(el);
+                if (style.display !== 'none' && style.visibility !== 'hidden') {
+                  // Check if it has product links or Miros content
+                  if (el.querySelector('a[href*="/p/"], [id*="miros"], [class*="miros"]')) {
+                    container = el;
+                    console.log('Found Miros container with content:', selector);
+                    break;
+                  }
+                }
+              }
+              if (container) break;
+            }
+          }
+          
+          // Method 3: Look for dialogs/modals that contain product links
+          if (!container) {
+            const allDialogs = document.querySelectorAll('[role="dialog"], .modal, [class*="modal"], [class*="overlay"]');
+            for (const dialog of allDialogs) {
+              // Exclude our focus overlay
+              if (dialog.id === 'focusOverlay' || dialog.classList.contains('focus-overlay')) continue;
+              
+              const style = window.getComputedStyle(dialog);
+              if (style.display !== 'none' && style.visibility !== 'hidden') {
+                // Check if it has product links
+                const hasProductLinks = dialog.querySelector('a[href*="/p/"]');
+                if (hasProductLinks) {
+                  container = dialog;
+                  console.log('Found dialog with product links:', dialog.id || dialog.className);
+                  break;
+                }
               }
             }
           }
           
-          // Method 3: Fallback to body
+          // Method 4: Fallback to body
           if (!container) {
             container = document.body;
             console.log('Using document.body as container');
@@ -506,13 +715,14 @@
                 };
               });
               
-              if (items.length > 0) {
-                renderResults(items);
-                return true;
-              }
+              // Always render results, even if empty
+              renderResults(items);
+              return items.length > 0;
             }
             
             console.error('No products found at all. Container:', container.id || container.className);
+            // Show empty results
+            renderResults([]);
             return false;
           }
 
@@ -782,12 +992,13 @@
           });
 
           console.log('Scraped items from Miros overlay:', items);
-          if (typeof renderResults === 'function' && items.length > 0) {
+          if (typeof renderResults === 'function') {
+            // Always call renderResults, even if empty - it handles empty state
             renderResults(items);
-            return true; // Success!
+            return items.length > 0; // Return true if we found items
           }
           
-          return false; // No items found
+          return false; // renderResults function not available
         }
 
         // Extract product ID from URL format: .../p/1025360
@@ -1299,13 +1510,13 @@
             console.log('AI button not found, trying to click mirosEntry');
             // Try multiple ways to trigger the overlay
             mirosEntry.click();
-            mirosEntry.dispatchEvent(
-              new MouseEvent("click", {
-                bubbles: true,
-                cancelable: true,
-                view: window,
-              }),
-            );
+          mirosEntry.dispatchEvent(
+            new MouseEvent("click", {
+              bubbles: true,
+              cancelable: true,
+              view: window,
+            }),
+          );
           } else {
             console.warn('No mirosEntry found and no AI button found');
           }
@@ -1364,8 +1575,8 @@
           });
         }
 
-        if (searchBtn && searchInput) {
-          searchBtn.addEventListener("click", async () => {
+        // Main search function
+        const performSearch = async () => {
             clearStatus();
             const rawValue = searchInput.value.trim();
 
@@ -1374,6 +1585,12 @@
               return;
             }
 
+          // CRITICAL: Transition to STATE 2 immediately when search is clicked
+          // Don't wait for results to load - show results section right away
+          if (!hasSearched) {
+            showResultsSection();
+          }
+
             const isSku = /^[A-Za-z0-9_-]+$/.test(rawValue);
             const attributes = {};
 
@@ -1381,106 +1598,150 @@
               attributes.item = rawValue;
               attributes.nlp = "";
             } else {
-              // Treat URLs and text the same - as NLP query
+            // Treat URLs and text the same - as NLP query
               attributes.item = "";
               attributes.nlp = rawValue;
               attributes.category = categorySelect?.value || "";
             }
 
-            // Configure Miros widget with the current query
+          // Configure Miros widget with the current query
             prepareEntry(attributes);
 
-            // Wait a bit for Miros widget to inject the AI button
-            showStatus("Opening Miros search...", "pending");
+          // Wait a bit for Miros widget to inject the AI button
+          showStatus("Opening Miros search...", "pending");
+          
+          // Try to find and click the AI button immediately, then retry if not found
+          const tryOpenOverlay = (attempt = 0) => {
+            const aiButton = 
+              document.querySelector('button.miros-search-on-entry-point') ||
+              document.querySelector('[class*="miros-search-on-entry-point"]') ||
+              document.querySelector('button[class*="miros"][class*="search"]') ||
+              document.querySelector('[data-miros-entry="miros-on-search"] button') ||
+              document.querySelector('#mirosEntry button');
             
-            // Try to find and click the AI button immediately, then retry if not found
-            const tryOpenOverlay = (attempt = 0) => {
-              const aiButton = 
-                document.querySelector('button.miros-search-on-entry-point') ||
-                document.querySelector('[class*="miros-search-on-entry-point"]') ||
-                document.querySelector('button[class*="miros"][class*="search"]') ||
-                document.querySelector('[data-miros-entry="miros-on-search"] button') ||
-                document.querySelector('#mirosEntry button');
+            if (aiButton) {
+              console.log('Found AI button, clicking to open overlay');
+              aiButton.click();
               
-              if (aiButton) {
-                console.log('Found AI button, clicking to open overlay');
-                aiButton.click();
-                
-                // Set up scraping after overlay opens
-                let observer = null;
-                let scrapeAttempts = 0;
-                const maxScrapeAttempts = 15; // Try for up to 15 seconds
-                const scrapeRetryInterval = 500; // Check every 500ms
+              // Set up scraping after overlay opens
+              let observer = null;
+              let scrapeAttempts = 0;
+              const maxScrapeAttempts = 15; // Try for up to 15 seconds
+              const scrapeRetryInterval = 500; // Check every 500ms
 
-                const tryScraping = async () => {
-                  scrapeAttempts++;
-                  console.log(`Attempt ${scrapeAttempts}/${maxScrapeAttempts} to scrape overlay`);
-                  const success = await scrapeMirosOverlayIntoTable();
+              const tryScraping = async () => {
+                // CRITICAL: Check max attempts BEFORE incrementing to prevent going over
+                if (scrapeAttempts >= maxScrapeAttempts) {
+                  if (observer) observer.disconnect();
+                  console.error('Failed to find overlay after all attempts. Debug info:');
+                  console.log('All Miros elements:', document.querySelectorAll('[id*="miros"], [class*="miros"], [data-miros]'));
+                  console.log('All dialogs/modals:', document.querySelectorAll('[role="dialog"], .modal, [class*="overlay"]'));
+                  console.log('All links with /p/:', document.querySelectorAll('a[href*="/p/"]'));
                   
-                  if (success) {
-                    if (observer) observer.disconnect();
-                    showStatus("Results loaded successfully!", "info");
-                    setTimeout(() => clearStatus(), 2000);
-                  } else if (scrapeAttempts < maxScrapeAttempts) {
-                    // Keep trying
-                    showStatus(`Waiting for results... (${scrapeAttempts}/${maxScrapeAttempts})`, "pending");
-                    setTimeout(tryScraping, scrapeRetryInterval);
-                  } else {
-                    // Give up after max attempts
-                    if (observer) observer.disconnect();
-                    
-                    // Final attempt: log debug info
-                    console.error('Failed to find overlay after all attempts. Debug info:');
-                    console.log('All Miros elements:', document.querySelectorAll('[id*="miros"], [class*="miros"], [data-miros]'));
-                    console.log('All dialogs/modals:', document.querySelectorAll('[role="dialog"], .modal, [class*="overlay"]'));
-                    console.log('All links with /p/:', document.querySelectorAll('a[href*="/p/"]'));
-                    
-                    showStatus("Results not found. Check console for debug info.", "error");
-                    setTimeout(() => clearStatus(), 3000);
-                  }
-                };
-
-                // Use MutationObserver to detect when overlay appears
-                observer = new MutationObserver((mutations) => {
-                  // Check if any new Miros elements appeared
-                  const hasNewMirosElements = mutations.some(mutation => {
-                    return Array.from(mutation.addedNodes).some(node => {
-                      if (node.nodeType !== 1) return false; // Not an element
-                      return node.querySelector && (
-                        node.querySelector('[id*="miros"], [class*="miros"], [data-miros]') ||
-                        node.id?.includes('miros') ||
-                        node.className?.includes('miros')
-                      );
+                  // Try one more time with direct link extraction as fallback
+                  const allProductLinks = Array.from(document.querySelectorAll('a[href*="/p/"]'))
+                    .filter(link => {
+                      const href = link.href || link.getAttribute('href') || '';
+                      return href.includes('/p/') && (href.includes('centrepointstores.com') || href.includes('centrepoint'));
                     });
-                  });
                   
-                  if (hasNewMirosElements) {
-                    console.log('Detected new Miros elements, attempting to scrape...');
-                    setTimeout(() => tryScraping(), 300); // Small delay to let DOM settle
+                  if (allProductLinks.length > 0) {
+                    console.log(`Found ${allProductLinks.length} product links directly, extracting...`);
+                    const items = allProductLinks.slice(0, 12).map(link => {
+                      const url = link.href || link.getAttribute('href') || '';
+                      const match = url.match(/\/p\/(\d+)/);
+                      const optionId = match ? match[1] : '-';
+                      const titleEl = link.querySelector('img[alt], .title, [class*="title"], [class*="name"]');
+                      const productTitle = titleEl?.textContent?.trim() || titleEl?.getAttribute('alt') || link.textContent?.trim() || 'Product';
+                      
+                      return {
+                        productTitle: productTitle.substring(0, 150),
+                        optionId: optionId,
+                        colourVariantId: '-',
+                        url: url,
+                        superCategory: '-',
+                        department: '-',
+                        keySection: '-',
+                        preferredCategory: '-',
+                      };
+                    });
+                    
+              renderResults(items);
+                    showStatus("Results loaded from direct link extraction!", "info");
+                    setTimeout(() => clearStatus(), 2000);
+                    return;
                   }
-                });
-
-                // Start observing
-                observer.observe(document.body, {
-                  childList: true,
-                  subtree: true,
-                  attributes: false
-                });
-
-                // Also start polling after initial delay (backup method)
-                setTimeout(tryScraping, 500);
+                  
+                  showStatus("Results not found. Check console for debug info.", "error");
+                  renderResults([]);
+                  setTimeout(() => clearStatus(), 3000);
+                  return;
+                }
                 
-              } else if (attempt < 10) {
-                // Widget might still be loading, try again
-                setTimeout(() => tryOpenOverlay(attempt + 1), 200);
-              } else {
-                // Fallback to old method
-                console.warn('AI button not found after retries, using fallback');
-                openMirosOverlay();
-              }
-            };
-            
-            tryOpenOverlay();
+                scrapeAttempts++;
+                console.log(`Attempt ${scrapeAttempts}/${maxScrapeAttempts} to scrape overlay`);
+                const success = await scrapeMirosOverlayIntoTable();
+                
+                if (success) {
+                  if (observer) observer.disconnect();
+                  showStatus("Results loaded successfully!", "info");
+                  // Results section already shown - renderResults() will populate the table
+                  setTimeout(() => clearStatus(), 2000);
+                } else {
+                  // Keep trying
+                  showStatus(`Waiting for results... (${scrapeAttempts}/${maxScrapeAttempts})`, "pending");
+                  setTimeout(tryScraping, scrapeRetryInterval);
+                }
+              };
+
+              // Use MutationObserver to detect when overlay appears
+              observer = new MutationObserver((mutations) => {
+                // Check if any new Miros elements appeared
+                const hasNewMirosElements = mutations.some(mutation => {
+                  return Array.from(mutation.addedNodes).some(node => {
+                    if (node.nodeType !== 1) return false; // Not an element
+                    return node.querySelector && (
+                      node.querySelector('[id*="miros"], [class*="miros"], [data-miros]') ||
+                      node.id?.includes('miros') ||
+                      node.className?.includes('miros')
+                    );
+                  });
+                });
+                
+                if (hasNewMirosElements) {
+                  console.log('Detected new Miros elements, attempting to scrape...');
+                  setTimeout(() => tryScraping(), 300); // Small delay to let DOM settle
+                }
+              });
+
+              // Start observing
+              observer.observe(document.body, {
+                childList: true,
+                subtree: true,
+                attributes: false
+              });
+
+              // Also start polling after initial delay (backup method)
+              setTimeout(tryScraping, 500);
+              
+            } else if (attempt < 10) {
+              // Widget might still be loading, try again
+              setTimeout(() => tryOpenOverlay(attempt + 1), 200);
+            } else {
+              // Fallback to old method
+              console.warn('AI button not found after retries, using fallback');
+            openMirosOverlay();
+            }
+          };
+          
+          tryOpenOverlay();
+        };
+
+        // Attach search to both buttons - ensure focus mode exits
+        if (searchBtn && searchInput) {
+          searchBtn.addEventListener("click", () => {
+            exitFocusOnSearch();
+            performSearch();
           });
         }
 
@@ -1488,6 +1749,72 @@
           clearResultsBtn.addEventListener("click", () => {
             clearStatus();
             clearResults();
+          });
+        }
+
+        // Download results as Excel file
+        if (downloadButton) {
+          downloadButton.addEventListener("click", () => {
+            try {
+              const rows = resultsBody.querySelectorAll("tr");
+              if (!rows || rows.length === 0 || (rows.length === 1 && rows[0].querySelector(".results-empty"))) {
+                showStatus("No results to download.", "error");
+                setTimeout(() => clearStatus(), 2000);
+                return;
+              }
+
+              const dataRows = Array.from(rows).filter(row => !row.querySelector(".results-empty"));
+
+              if (!dataRows.length) {
+                showStatus("No data to download.", "error");
+                setTimeout(() => clearStatus(), 2000);
+                return;
+              }
+
+              if (typeof XLSX === "undefined") {
+                showStatus("Excel library not loaded. Please refresh the page.", "error");
+                setTimeout(() => clearStatus(), 3000);
+                return;
+              }
+
+              const headers = Array.from(document.querySelectorAll(".results-grid thead th")).map(
+                (th) => th.textContent.trim()
+              );
+
+              const data = dataRows.map((row) =>
+                Array.from(row.querySelectorAll("td")).map((td) => {
+                  const link = td.querySelector("a");
+                  if (link) {
+                    return link.href;
+                  }
+                  return td.textContent.trim().replace(/\s+/g, " ") || "-";
+                })
+              );
+
+              const worksheetData = [headers, ...data];
+              const wb = XLSX.utils.book_new();
+              const ws = XLSX.utils.aoa_to_sheet(worksheetData);
+
+              const colWidths = headers.map((_, index) => {
+                const maxLength = worksheetData.reduce((max, row) => {
+                  const cell = row[index] || "";
+                  return Math.max(max, cell.toString().length);
+                }, 10);
+                return { wch: Math.min(Math.max(maxLength + 2, 12), 60) };
+              });
+              ws["!cols"] = colWidths;
+
+              XLSX.utils.book_append_sheet(wb, ws, "Search Results");
+              const fileName = `miros-search-results-${new Date().toISOString().split("T")[0]}.xlsx`;
+              XLSX.writeFile(wb, fileName);
+
+              showStatus("Results downloaded successfully!", "success");
+              setTimeout(() => clearStatus(), 2000);
+            } catch (error) {
+              console.error("Download failed:", error);
+              showStatus("Could not download results. Check console for details.", "error");
+              setTimeout(() => clearStatus(), 3000);
+            }
           });
         }
 
