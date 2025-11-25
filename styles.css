@@ -561,17 +561,30 @@ body.has-results .dashboard__header-title {
 }
 
 .dashboard__status {
-  min-height: 1.5rem;
-  font-size: var(--font-size-sm);
+  position: fixed;
+  top: var(--spacing-md);
+  left: var(--spacing-md);
+  min-height: auto;
+  font-size: 0.75rem;
   font-weight: 500;
   color: var(--color-text-secondary);
-  padding: var(--spacing-sm) var(--spacing-xl);
-  display: flex;
+  padding: 0.125rem 0.75rem;
+  display: inline-flex;
   align-items: center;
-  gap: var(--spacing-xs);
-  max-width: 1400px;
-  margin: 0 auto;
-  transition: all var(--transition-slow);
+  gap: calc(var(--spacing-xs) / 2);
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: var(--shadow-sm);
+  pointer-events: none;
+  z-index: 40;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+
+.dashboard__status.visible {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .dashboard__status[data-status="pending"] {
@@ -962,7 +975,7 @@ body.has-results .dashboard__header {
   body {
     padding: 0;
   }
-  
+
   .dashboard__header {
     padding: var(--spacing-md) var(--spacing-lg);
   }

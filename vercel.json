@@ -1,0 +1,16 @@
+{
+  "version": 2,
+  "name": "miros-collection-builder",
+  "public": true,
+  "builds": [
+    { "src": "index.html", "use": "@vercel/static" },
+    { "src": "styles.css", "use": "@vercel/static" },
+    { "src": "add_photo_alternate.svg", "use": "@vercel/static" },
+    { "src": "CPLogo.png", "use": "@vercel/static" }
+  ],
+  "routes": [
+    { "handle": "filesystem" },
+    { "src": "/.*", "dest": "/index.html" }
+  ]
+}
+

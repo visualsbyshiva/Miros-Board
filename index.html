@@ -85,7 +85,7 @@
       </header>
       <p class="dashboard__status" id="statusMessage" aria-live="polite"></p>
       <section class="dashboard__results" id="dashboardResults">
-        <div class="results-card">
+            <div>
           <div class="results-summary" id="resultsSummary" style="display: none;">
             <span class="results-summary__text" id="resultsSummaryText">
               Enter a search term, SKU ID, or upload an image to see product-level recommendations here.
@@ -144,6 +144,9 @@
         let allProducts = []; // Store all scraped products
         let currentPage = 1;
         const itemsPerPage = 20;
+        let statusHideTimer = null;
+        let lastStatusUpdate = 0;
+        let lastStatusText = "";
 
         // STATE 1: Initial State - hide results on first load
         if (dashboardResults) {
@@ -268,6 +271,21 @@
               }
             }, 10);
           });
+
+          const triggerSearchOnEnter = (e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              exitFocusOnSearch();
+              performSearch();
+            }
+          };
+
+          // Also listen globally so Enter works even when focus mode overlay is active
+          document.addEventListener('keydown', (e) => {
+            if (document.activeElement === searchInput) {
+              triggerSearchOnEnter(e);
+            }
+          });
         }
 
         // Exit focus mode when search button is clicked - returns to STATE 2
@@ -299,17 +317,42 @@
         };
 
         // This helper shows a friendly status message so people know what is happening.
-        const showStatus = (message, type = "info") => {
+        const showStatus = (message, type = "info", options = {}) => {
           if (!statusMessage) return;
+          const { autoHideDelay = 6000 } = options;
+          
           statusMessage.textContent = message;
           statusMessage.dataset.status = type;
+          statusMessage.classList.add("visible");
+          lastStatusText = message;
+          lastStatusUpdate = Date.now();
+          
+          if (statusHideTimer) {
+            clearTimeout(statusHideTimer);
+            statusHideTimer = null;
+          }
+          
+          if (type === "pending") {
+            statusHideTimer = setTimeout(() => {
+              const isStale = Date.now() - lastStatusUpdate >= autoHideDelay - 50;
+              if (isStale) {
+                clearStatus();
+              }
+            }, autoHideDelay);
+          }
         };
 
         // This helper wipes the status text when we are done talking to the user.
         const clearStatus = () => {
           if (!statusMessage) return;
+          if (statusHideTimer) {
+            clearTimeout(statusHideTimer);
+            statusHideTimer = null;
+          }
           statusMessage.textContent = "";
           statusMessage.dataset.status = "";
+          statusMessage.classList.remove("visible");
+          lastStatusText = "";
         };
 
         // This helper turns the raw number of hits into a short sentence kids can read.
@@ -343,6 +386,17 @@
           // Keep results section visible in STATE 2, just clear the data
         };
 
+        // Prepare UI for a brand-new search request (clears table + pagination)
+        const prepareResultsForNewSearch = () => {
+          allProducts = [];
+          currentPage = 1;
+          if (resultsBody) {
+            resultsBody.innerHTML =
+              '<tr><td colspan="4" class="results-empty">Searching Miros for matching products...</td></tr>';
+          }
+          updatePagination();
+        };
+
         // This helper builds the table rows so we can actually see the product cards.
         const renderResults = (items = []) => {
           if (!resultsBody) return;
@@ -350,7 +404,7 @@
           // If no items but we have allProducts, show empty message
           if (!items.length && allProducts.length === 0) {
             resultsBody.innerHTML =
-              '<tr><td colspan="4" class="results-empty">No matching products found.</td></tr>';
+              '<tr><td colspan="4" class="results-empty">No results found. Try a different URL, SKU, or product attribute.</td></tr>';
             summariseResults(0);
             return;
           }
@@ -358,7 +412,7 @@
           // If no items for current page but we have products, show message
           if (!items.length && allProducts.length > 0) {
             resultsBody.innerHTML =
-              '<tr><td colspan="4" class="results-empty">No items on this page.</td></tr>';
+              '<tr><td colspan="4" class="results-empty">No results found. Try a different URL, SKU, or product attribute.</td></tr>';
             summariseResults(allProducts.length);
             return;
           }
@@ -409,19 +463,24 @@
         const MIROS_API_URL = 'https://api.miros.services/graphql';
         const MIROS_INTEGRATION_ID = 'fb97f7d4-fe95-402f-a81a-402cb062eaa3';
         const MIROS_SLOT = 1; // Default slot for autocomplete suggestions
+        const MIROS_API_KEY = '0ddbc6c416ae8f61af7079a7892592138e38b9ad5204cf4ec0682b0e8eea16fe';
+        const TARGET_PRODUCT_COUNT = 100;
 
         // Direct API call to Miros GraphQL (no popup - fills table directly)
         async function callMirosAPI(query, variables) {
           try {
-            const response = await fetch(MIROS_API_URL, {
+            const headers = {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
                 'X-Integration-Id': MIROS_INTEGRATION_ID,
-                // Try without API key first - some integrations work with just Integration ID
               },
               body: JSON.stringify({ query, variables }),
-            });
+            };
+            if (MIROS_API_KEY) {
+              headers.headers['x-api-key'] = MIROS_API_KEY;
+            }
+            const response = await fetch(MIROS_API_URL, headers);
 
             if (!response.ok) {
               const errorText = await response.text();
@@ -452,6 +511,62 @@
             console.error('Error calling Miros API:', error);
             throw error;
           }
+        }
+
+        const AUTOCOMPLETE_SUGGESTIONS_QUERY = `
+          query AutocompleteSuggestions($integration_id: ID!, $slot: Int!, $query: AutocompleteSuggestionsQuery!) {
+            autocompleteSuggestionsPage(integration_id: $integration_id, slot: $slot, query: $query) {
+              edges {
+                node {
+                  itemId
+                  title
+                  url
+                  imageUrl
+                }
+              }
+            }
+          }
+        `;
+
+        function collectNodesFromAutocomplete(page) {
+          if (!page) return [];
+          if (Array.isArray(page.edges)) {
+            return page.edges.map(edge => edge?.node).filter(Boolean);
+          }
+          return [];
+        }
+
+        async function fetchProductsViaAPI(rawValue) {
+          if (!MIROS_API_KEY) return [];
+
+          const baseVariables = {
+            integration_id: MIROS_INTEGRATION_ID,
+            slot: MIROS_SLOT,
+          };
+
+          const queryStrategies = [
+            { text: rawValue },
+            { q: rawValue },
+          ];
+
+          for (const queryInput of queryStrategies) {
+            try {
+              const data = await callMirosAPI(AUTOCOMPLETE_SUGGESTIONS_QUERY, {
+                ...baseVariables,
+                query: queryInput,
+              });
+
+              const nodes = collectNodesFromAutocomplete(data?.autocompleteSuggestionsPage);
+              if (nodes.length) {
+                const transformed = nodes.map(transformMirosResult);
+                return transformed.slice(0, TARGET_PRODUCT_COUNT);
+              }
+            } catch (error) {
+              console.warn('Direct Miros API search failed with query input', queryInput, error);
+            }
+          }
+
+          return [];
         }
 
         // Introspect GraphQL schema to find ALL available queries
@@ -1018,21 +1133,79 @@
 
           console.log('Scraped items from Miros overlay:', items);
           
-          // Store all products and try to get more if we have less than 100
-          allProducts = items;
+          // Store all products and try to get more if we have less than the target
+          const existingProducts = Array.isArray(allProducts) ? [...allProducts] : [];
+          const existingUrls = new Set(existingProducts.map(item => item.url || item.optionId));
+          const initialNewItems = items.filter(item => {
+            const key = item.url || item.optionId;
+            if (!key) return true;
+            return !existingUrls.has(key);
+          });
+          allProducts = [...existingProducts, ...initialNewItems];
           
-          // Try to scroll and load more products if we have less than 100
-          if (items.length < 100) {
-            // Scroll the overlay to load more products
-            const scrollableContainer = container.querySelector('[style*="overflow"], [class*="scroll"], [class*="grid"], [class*="masonry"]') || container;
-            if (scrollableContainer && scrollableContainer.scrollHeight > scrollableContainer.clientHeight) {
-              // Scroll to bottom to trigger lazy loading
-              scrollableContainer.scrollTop = scrollableContainer.scrollHeight;
+          // Enhanced scrolling to fetch 100+ items
+          if (allProducts.length < TARGET_PRODUCT_COUNT) {
+            const targetItems = TARGET_PRODUCT_COUNT;
+            const maxScrollAttempts = 25; // Maximum scroll attempts
+            let scrollAttempts = 0;
+            const scrollDelay = 2000; // Wait 2 seconds between scrolls
+            let isScrolling = false;
+            
+            // Find the scrollable container with better detection
+            const findScrollableContainer = () => {
+              // Try multiple selectors for scrollable containers
+              const selectors = [
+                '[style*="overflow"]',
+                '[class*="scroll"]',
+                '[class*="grid"]',
+                '[class*="masonry"]',
+                '[class*="list"]',
+                '[class*="container"]',
+                '[data-scroll]'
+              ];
               
-              // Wait a bit and try to scrape again
-              setTimeout(async () => {
-                const moreImages = scrollableContainer.querySelectorAll('img[src]');
-                const moreProductImages = Array.from(moreImages).filter(img => {
+              for (const selector of selectors) {
+                const elements = container.querySelectorAll(selector);
+                for (const el of elements) {
+                  const style = window.getComputedStyle(el);
+                  if (el.scrollHeight > el.clientHeight && 
+                      (style.overflow === 'auto' || style.overflow === 'scroll' || 
+                       style.overflowY === 'auto' || style.overflowY === 'scroll' ||
+                       style.overflowX === 'auto' || style.overflowX === 'scroll')) {
+                    return el;
+                  }
+                }
+              }
+              
+              // Fallback: check container itself and parent elements
+              let current = container;
+              for (let i = 0; i < 5 && current; i++) {
+                if (current.scrollHeight > current.clientHeight) {
+                  return current;
+                }
+                current = current.parentElement;
+              }
+              
+            return null;
+            };
+            
+            const scrollableContainer = findScrollableContainer();
+            
+            if (scrollableContainer) {
+              console.log('Found scrollable container, attempting to load 100+ items...');
+              console.log('Container dimensions:', {
+                scrollHeight: scrollableContainer.scrollHeight,
+                clientHeight: scrollableContainer.clientHeight,
+                scrollTop: scrollableContainer.scrollTop
+              });
+              
+              // Function to extract ALL products from DOM (search entire container, not just scrollableContainer)
+              const extractAllProductsFromDOM = () => {
+                // Search in the entire container to find all products
+                const allImages = container.querySelectorAll('img[src]');
+                console.log(`Found ${allImages.length} total images in container`);
+                
+                const allProductImages = Array.from(allImages).filter(img => {
                   const src = img.src || img.getAttribute('src') || '';
                   const alt = img.alt || '';
                   const width = img.naturalWidth || img.width || 0;
@@ -1050,67 +1223,408 @@
                   return hasText;
                 });
                 
-                if (moreProductImages.length > items.length) {
-                  // Re-scrape with new images
-                  const sortedMore = Array.from(moreProductImages).sort((a, b) => {
-                    const rectA = a.getBoundingClientRect();
-                    const rectB = b.getBoundingClientRect();
-                    const topDiff = rectA.top - rectB.top;
-                    if (Math.abs(topDiff) > 50) return topDiff;
-                    return rectA.left - rectB.left;
-                  });
+                console.log(`Filtered to ${allProductImages.length} product images`);
+                
+                // Sort by visual position
+                const sortedImages = Array.from(allProductImages).sort((a, b) => {
+                  const rectA = a.getBoundingClientRect();
+                  const rectB = b.getBoundingClientRect();
+                  const topDiff = rectA.top - rectB.top;
+                  if (Math.abs(topDiff) > 50) return topDiff;
+                  return rectA.left - rectB.left;
+                });
+                
+                // Extract ALL product data (we'll filter duplicates later)
+                const allItems = sortedImages.map((productImg) => {
+                  const card = productImg.closest('[role="listitem"], [class*="card"], [class*="item"], a') || productImg.parentElement;
+                  const productContainer = card.closest('[role="listitem"], [class*="card"], [class*="item"]') || card;
+                  const img = productImg;
+                  const imageUrl = img.src || img.getAttribute('src') || '';
                   
-                  // Extract additional items (skip duplicates)
-                  const existingUrls = new Set(items.map(item => item.url));
-                  const additionalItems = sortedMore
-                    .slice(items.length)
-                    .map((productImg) => {
-                      const card = productImg.closest('[role="listitem"], [class*="card"], [class*="item"], a') || productImg.parentElement;
-                      const productContainer = card.closest('[role="listitem"], [class*="card"], [class*="item"]') || card;
-                      const img = productImg;
-                      const imageUrl = img.src || img.getAttribute('src') || '';
-                      
-                      // Quick extraction (simplified)
-                      const titleEl = productContainer.querySelector('h1, h2, h3, h4, h5, h6, [class*="title"], [class*="name"]') || 
-                                     Array.from(productContainer.querySelectorAll('p, span, div')).find(el => {
-                                       const text = el.textContent?.trim() || '';
-                                       return text.length > 10 && text.length < 200 && !text.match(/^AED\s*\d+/) && !text.match(/^\$\d+/);
-                                     });
-                      const productTitle = titleEl?.textContent?.trim() || img.getAttribute('alt') || '-';
-                      
-                      const linkEl = productContainer.querySelector('a[href*="/p/"]') || card.querySelector('a[href*="/p/"]');
-                      const url = linkEl?.href || linkEl?.getAttribute('href') || '';
-                      
-                      if (url && existingUrls.has(url)) return null; // Skip duplicates
-                      
-                      const match = url.match(/\/p\/([^?]+)/);
-                      const optionId = match ? match[1] : '-';
-                      
-                      return {
-                        productTitle: productTitle || `Product ${allProducts.length + 1}`,
-                        optionId: optionId,
-                        url: url || '-',
-                        imageUrl: imageUrl || '',
-                      };
-                    })
-                    .filter(item => item !== null);
+                  const titleEl = productContainer.querySelector('h1, h2, h3, h4, h5, h6, [class*="title"], [class*="name"]') || 
+                                 Array.from(productContainer.querySelectorAll('p, span, div')).find(el => {
+                                   const text = el.textContent?.trim() || '';
+                                   return text.length > 10 && text.length < 200 && !text.match(/^AED\s*\d+/) && !text.match(/^\$\d+/);
+                                 });
+                  const productTitle = titleEl?.textContent?.trim() || img.getAttribute('alt') || '-';
                   
-                  allProducts = [...allProducts, ...additionalItems];
-                  console.log(`Total products after scrolling: ${allProducts.length}`);
+                  const linkEl = productContainer.querySelector('a[href*="/p/"]') || card.querySelector('a[href*="/p/"]');
+                  const url = linkEl?.href || linkEl?.getAttribute('href') || '';
                   
-                  // Update pagination and render
+                  if (!url || url === '-' || !url.includes('/p/')) return null;
+                  
+                  const match = url.match(/\/p\/([^?]+)/);
+                  const optionId = match ? match[1] : '-';
+                  
+                  return {
+                    productTitle: productTitle || `Product`,
+                    optionId: optionId,
+                    url: url,
+                    imageUrl: imageUrl || '',
+                  };
+                }).filter(item => item !== null && item.url !== '-');
+                
+                // Filter duplicates by URL to get unique items
+                const uniqueItems = [];
+                const seenUrls = new Set();
+                for (const item of allItems) {
+                  if (!seenUrls.has(item.url)) {
+                    seenUrls.add(item.url);
+                    uniqueItems.push(item);
+                  }
+                }
+                
+                console.log(`Extracted ${uniqueItems.length} unique products from DOM`);
+                return uniqueItems;
+              };
+              
+              // Function to update products list with all extracted items (NO UI UPDATE - just store data)
+              const updateProductsList = () => {
+                const allExtracted = extractAllProductsFromDOM();
+                
+                if (allExtracted.length > allProducts.length) {
+                  allProducts = allExtracted; // Replace with all items (no duplicates)
+                  console.log(`✅ Updated: Total products now: ${allProducts.length}`);
+                  
+                  // Show progress in status message only (NO table update until done)
+                  showStatus(`Fetching products from overlay... (${allProducts.length}/${targetItems} products fetched)`, "pending");
+                  
+                  return true;
+                } else if (allExtracted.length === allProducts.length) {
+                  console.log(`No new items found. Current total: ${allProducts.length}`);
+                  return false;
+                }
+                
+                return false;
+              };
+              
+              // Function to show loading state in table
+              const showLoadingInTable = () => {
+                const resultsBody = document.getElementById('resultsBody');
+                if (resultsBody) {
+                  resultsBody.innerHTML = `<tr><td colspan="4" class="results-empty" style="text-align: center; padding: 40px;">
+                    <div style="font-size: 16px; color: var(--text-secondary); margin-bottom: 10px;">
+                      Loading products from overlay...
+                    </div>
+                    <div style="font-size: 14px; color: var(--text-muted);">
+                      ${allProducts.length}/${targetItems} products fetched
+                    </div>
+                  </td></tr>`;
+                }
+              };
+              
+              // Use MutationObserver to detect when new items are loaded
+              const observer = new MutationObserver((mutations) => {
+                if (isScrolling) return; // Prevent concurrent processing
+                
+                const hasNewContent = mutations.some(mutation => {
+                  return mutation.addedNodes.length > 0;
+                });
+                
+                if (hasNewContent) {
+                  // Wait a bit for content to fully render
+                  setTimeout(() => {
+                    updateProductsList();
+                    showLoadingInTable(); // Update loading message
+                    isScrolling = false;
+                  }, 1000);
+                }
+              });
+              
+              // Start observing both scrollableContainer and container
+              observer.observe(scrollableContainer, {
+                childList: true,
+                subtree: true
+              });
+              observer.observe(container, {
+                childList: true,
+                subtree: true
+              });
+              
+              // Show loading state in table immediately
+              showLoadingInTable();
+              
+              // Start scrolling process
+              const scrollInterval = setInterval(() => {
+                // Check if we've reached our goal or max attempts
+                if (allProducts.length >= targetItems) {
+                  clearInterval(scrollInterval);
+                  observer.disconnect();
+                  console.log(`✅ Target reached! Total items: ${allProducts.length}`);
+                  
+                  // Final update to ensure all items are captured
+                  updateProductsList();
+                  
+                  // NOW update UI with all products
                   currentPage = 1;
                   updatePagination();
                   renderResults(getCurrentPageItems());
+                  
+                  // Close overlay after scraping is complete
+                  setTimeout(() => {
+                    closeMirosOverlay();
+                    showStatus(`Successfully loaded ${allProducts.length} products!`, "success");
+                    setTimeout(() => clearStatus(), 2000);
+                  }, 500);
+                  
+                  return;
                 }
+                
+                if (scrollAttempts >= maxScrollAttempts) {
+                  clearInterval(scrollInterval);
+                  observer.disconnect();
+                  console.log(`⚠️ Max attempts reached. Total items: ${allProducts.length}`);
+                  
+                  // Final extraction
+                  updateProductsList();
+                  
+                  // NOW update UI with all products we found
+                  currentPage = 1;
+                  updatePagination();
+                  renderResults(getCurrentPageItems());
+                  
+                  // Close overlay
+                  setTimeout(() => {
+                    closeMirosOverlay();
+                    showStatus(`Loaded ${allProducts.length} products (max attempts reached)`, "info");
+                    setTimeout(() => clearStatus(), 2000);
+                  }, 500);
+                  
+                  return;
+                }
+                
+                if (isScrolling) return; // Skip if already processing
+                isScrolling = true;
+                
+                const previousScrollTop = scrollableContainer.scrollTop;
+                const previousScrollHeight = scrollableContainer.scrollHeight;
+                
+                // Scroll to bottom
+                scrollableContainer.scrollTop = scrollableContainer.scrollHeight;
+                scrollAttempts++;
+                
+                // Update status and loading table
+                showStatus(`Fetching products from overlay... (${allProducts.length}/${targetItems} products fetched)`, "pending");
+                showLoadingInTable();
+                
+                console.log(`📜 Scroll attempt ${scrollAttempts}/${maxScrollAttempts}, current items: ${allProducts.length}`);
+                
+                // Check if we've reached the end (scroll position didn't change)
+                setTimeout(() => {
+                  const newScrollHeight = scrollableContainer.scrollHeight;
+                  const newScrollTop = scrollableContainer.scrollTop;
+                  
+                  if (newScrollTop === previousScrollTop && newScrollHeight === previousScrollHeight) {
+                    // Reached end - do final extraction
+                    console.log('⚠️ Reached end of scrollable content');
+                    updateProductsList();
+                    isScrolling = false;
+                    
+                    // If we still don't have 100, try one more aggressive extraction
+                    if (allProducts.length < targetItems) {
+                      console.log('Trying one more extraction pass...');
+                      setTimeout(() => {
+                        updateProductsList();
+                        
+                        // NOW update UI with all products
+                        currentPage = 1;
+                        updatePagination();
+                        renderResults(getCurrentPageItems());
+                        
+                        setTimeout(() => {
+                          closeMirosOverlay();
+                          showStatus(`Loaded ${allProducts.length} products successfully!`, "success");
+                          setTimeout(() => clearStatus(), 2000);
+                        }, 500);
+                      }, 1500);
+                    } else {
+                      // We have 100+, update UI now
+                      currentPage = 1;
+                      updatePagination();
+                      renderResults(getCurrentPageItems());
+                      
+                      setTimeout(() => {
+                        closeMirosOverlay();
+                        showStatus(`Successfully loaded ${allProducts.length} products!`, "success");
+                        setTimeout(() => clearStatus(), 2000);
+                      }, 500);
+                    }
+                  } else {
+                    // New content might be loading, extract after delay
+                    setTimeout(() => {
+                      updateProductsList();
+                      showLoadingInTable(); // Update loading message
+                      isScrolling = false;
+                    }, 1500);
+                  }
+                }, 800);
+              }, scrollDelay);
+              
+              // Initial extraction and first scroll
+              setTimeout(() => {
+                // Do initial extraction
+                updateProductsList();
+                showLoadingInTable();
+                
+                // Then scroll
+                scrollableContainer.scrollTop = scrollableContainer.scrollHeight;
+                
+                // Extract again after scroll
+                setTimeout(() => {
+                  updateProductsList();
+                  showLoadingInTable();
+                }, 2000);
               }, 1000);
+              
+            } else {
+              console.warn('No scrollable container found. Attempting to extract all items from container...');
+              
+              // Show loading state
+              const resultsBody = document.getElementById('resultsBody');
+              if (resultsBody) {
+                resultsBody.innerHTML = `<tr><td colspan="4" class="results-empty" style="text-align: center; padding: 40px;">
+                  <div style="font-size: 16px; color: var(--text-secondary); margin-bottom: 10px;">
+                    Loading products from overlay...
+                  </div>
+                  <div style="font-size: 14px; color: var(--text-muted);">
+                    ${allProducts.length}/${targetItems} products fetched
+                  </div>
+                </td></tr>`;
+              }
+              
+              // Still try to extract all products from the container
+              const extractAllProductsFromDOM = () => {
+                const allImages = container.querySelectorAll('img[src]');
+                console.log(`Found ${allImages.length} total images in container`);
+                
+                const allProductImages = Array.from(allImages).filter(img => {
+                  const src = img.src || img.getAttribute('src') || '';
+                  const alt = img.alt || '';
+                  const width = img.naturalWidth || img.width || 0;
+                  const height = img.naturalHeight || img.height || 0;
+                  
+                  if (width > 0 && width < 100) return false;
+                  if (height > 0 && height < 100) return false;
+                  if (alt.toLowerCase().includes('logo') || alt.toLowerCase().includes('icon')) return false;
+                  if (src.includes('logo') || src.includes('icon')) return false;
+                  
+                  const parent = img.closest('[role="listitem"], [class*="card"], [class*="item"], a');
+                  if (!parent) return false;
+                  
+                  const hasText = parent.textContent && parent.textContent.trim().length > 10;
+                  return hasText;
+                });
+                
+                const sortedImages = Array.from(allProductImages).sort((a, b) => {
+                  const rectA = a.getBoundingClientRect();
+                  const rectB = b.getBoundingClientRect();
+                  const topDiff = rectA.top - rectB.top;
+                  if (Math.abs(topDiff) > 50) return topDiff;
+                  return rectA.left - rectB.left;
+                });
+                
+                const allItems = sortedImages.map((productImg) => {
+                  const card = productImg.closest('[role="listitem"], [class*="card"], [class*="item"], a') || productImg.parentElement;
+                  const productContainer = card.closest('[role="listitem"], [class*="card"], [class*="item"]') || card;
+                  const img = productImg;
+                  const imageUrl = img.src || img.getAttribute('src') || '';
+                  
+                  const titleEl = productContainer.querySelector('h1, h2, h3, h4, h5, h6, [class*="title"], [class*="name"]') || 
+                                 Array.from(productContainer.querySelectorAll('p, span, div')).find(el => {
+                                   const text = el.textContent?.trim() || '';
+                                   return text.length > 10 && text.length < 200 && !text.match(/^AED\s*\d+/) && !text.match(/^\$\d+/);
+                                 });
+                  const productTitle = titleEl?.textContent?.trim() || img.getAttribute('alt') || '-';
+                  
+                  const linkEl = productContainer.querySelector('a[href*="/p/"]') || card.querySelector('a[href*="/p/"]');
+                  const url = linkEl?.href || linkEl?.getAttribute('href') || '';
+                  
+                  if (!url || url === '-' || !url.includes('/p/')) return null;
+                  
+                  const match = url.match(/\/p\/([^?]+)/);
+                  const optionId = match ? match[1] : '-';
+                  
+                  return {
+                    productTitle: productTitle || `Product`,
+                    optionId: optionId,
+                    url: url,
+                    imageUrl: imageUrl || '',
+                  };
+                }).filter(item => item !== null && item.url !== '-');
+                
+                const uniqueItems = [];
+                const seenUrls = new Set();
+                for (const item of allItems) {
+                  if (!seenUrls.has(item.url)) {
+                    seenUrls.add(item.url);
+                    uniqueItems.push(item);
+                  }
+                }
+                
+                console.log(`Extracted ${uniqueItems.length} unique products from container`);
+                return uniqueItems;
+              };
+              
+              // Try multiple times to extract all products
+              let extractionAttempts = 0;
+              const maxExtractionAttempts = 5;
+              const extractionInterval = setInterval(() => {
+                extractionAttempts++;
+                const allExtracted = extractAllProductsFromDOM();
+                
+                if (allExtracted.length > allProducts.length) {
+                  allProducts = allExtracted;
+                  console.log(`Updated products: ${allProducts.length}`);
+                  
+                  // Update loading message
+                  showStatus(`Fetching products from overlay... (${allProducts.length}/${targetItems} products fetched)`, "pending");
+                  if (resultsBody) {
+                    resultsBody.innerHTML = `<tr><td colspan="4" class="results-empty" style="text-align: center; padding: 40px;">
+                      <div style="font-size: 16px; color: var(--text-secondary); margin-bottom: 10px;">
+                        Loading products from overlay...
+                      </div>
+                      <div style="font-size: 14px; color: var(--text-muted);">
+                        ${allProducts.length}/${targetItems} products fetched
+                      </div>
+                    </td></tr>`;
+                  }
+                }
+                
+                if (allProducts.length >= targetItems || extractionAttempts >= maxExtractionAttempts) {
+                  clearInterval(extractionInterval);
+                  
+                  // NOW update UI with all products
+                  currentPage = 1;
+                  updatePagination();
+                  renderResults(getCurrentPageItems());
+                  
+                  setTimeout(() => {
+                    closeMirosOverlay();
+                    showStatus(`Successfully loaded ${allProducts.length} products!`, "success");
+                    setTimeout(() => clearStatus(), 2000);
+                  }, 500);
+                }
+              }, 2000);
             }
+          } else {
+            // If we already have 100+ items, render immediately and close overlay
+            currentPage = 1;
+            updatePagination();
+            renderResults(getCurrentPageItems());
+            
+            setTimeout(() => {
+              closeMirosOverlay();
+              showStatus(`Successfully loaded ${allProducts.length} products!`, "success");
+              setTimeout(() => clearStatus(), 2000);
+            }, 500);
           }
           
-          // Initialize pagination and render first page
-          currentPage = 1;
-          updatePagination();
-          renderResults(getCurrentPageItems());
+          // Only initialize pagination if we're not fetching (already have 100+)
+          // Otherwise, pagination will be initialized after fetching completes
+          if (items.length >= 100) {
+            currentPage = 1;
+            updatePagination();
+          }
           
           return items.length > 0;
         }
@@ -1707,6 +2221,67 @@
           }
         };
 
+        // Helper to close Miros widget overlay
+        const closeMirosOverlay = () => {
+          console.log('Attempting to close Miros overlay...');
+          
+          // Method 1: Find and click close button
+          const closeButtonSelectors = [
+            'button[aria-label*="close" i]',
+            'button[aria-label*="×"]',
+            'button[aria-label*="Close"]',
+            '[class*="close"] button',
+            '[class*="close-button"]',
+            '[class*="modal-close"]',
+            '[class*="overlay-close"]',
+            'button.close',
+            '.close-button',
+            '[data-dismiss="modal"]',
+            '[data-close]'
+          ];
+          
+          for (const selector of closeButtonSelectors) {
+            const closeBtn = document.querySelector(selector);
+            if (closeBtn && closeBtn.offsetParent !== null) { // Check if visible
+              console.log('Found close button, clicking:', selector);
+              closeBtn.click();
+              // Wait a bit and check if overlay closed
+              setTimeout(() => {
+                const overlay = document.querySelector('[role="dialog"], .modal, [class*="modal"], [class*="overlay"]');
+                if (overlay && overlay.id !== 'focusOverlay') {
+                  console.log('Overlay still open, trying ESC key...');
+                  // Try ESC key
+                  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true }));
+                }
+              }, 300);
+              return true;
+            }
+          }
+          
+          // Method 2: Try ESC key
+          console.log('Close button not found, trying ESC key...');
+          document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true }));
+          document.dispatchEvent(new KeyboardEvent('keyup', { key: 'Escape', keyCode: 27, bubbles: true }));
+          
+          // Method 3: Hide overlay with CSS as fallback
+          setTimeout(() => {
+            const overlay = document.querySelector('[role="dialog"], .modal, [class*="modal"], [class*="overlay"]');
+            if (overlay && overlay.id !== 'focusOverlay' && !overlay.classList.contains('focus-overlay')) {
+              console.log('Hiding overlay with CSS as fallback');
+              overlay.style.display = 'none';
+              overlay.style.visibility = 'hidden';
+              overlay.style.opacity = '0';
+              // Also hide any backdrop
+              const backdrop = document.querySelector('[class*="backdrop"], [class*="overlay-backdrop"]');
+              if (backdrop) {
+                backdrop.style.display = 'none';
+              }
+            }
+          }, 500);
+          
+          return false;
+        };
+
         // Upload image and get data URL (no backend needed - widget handles it)
         const uploadImageToMiros = async (file) => {
           return new Promise((resolve, reject) => {
@@ -1762,38 +2337,68 @@
 
         // Main search function
         const performSearch = async () => {
-            clearStatus();
-            const rawValue = searchInput.value.trim();
+          clearStatus();
+          const rawValue = searchInput.value.trim();
 
-            if (!rawValue) {
-              showStatus("Enter a search term or SKU to continue.", "error");
-              return;
-            }
+          if (!rawValue) {
+            showStatus("Enter a search term or SKU to continue.", "error");
+            return;
+          }
 
           // CRITICAL: Transition to STATE 2 immediately when search is clicked
-          // Don't wait for results to load - show results section right away
           if (!hasSearched) {
             showResultsSection();
+          }
+
+          prepareResultsForNewSearch();
+
+          const isSku = /^[A-Za-z0-9_-]+$/.test(rawValue);
+          const attributes = {};
+
+          if (isSku) {
+            attributes.item = rawValue;
+            attributes.nlp = "";
+          } else {
+            attributes.item = "";
+            attributes.nlp = rawValue;
+            attributes.category = categorySelect?.value || "";
+          }
+
+          // Try direct API fetch first (guarantees up to 100 items when available)
+          let directResults = [];
+          if (MIROS_API_KEY) {
+            showStatus("Fetching products via Miros API...", "pending");
+            try {
+              directResults = await fetchProductsViaAPI(rawValue);
+            } catch (error) {
+              console.warn('Direct Miros API fetch failed, falling back to widget overlay.', error);
             }
+          }
 
-            const isSku = /^[A-Za-z0-9_-]+$/.test(rawValue);
-            const attributes = {};
+          if (directResults.length) {
+            allProducts = directResults;
+            currentPage = 1;
+            updatePagination();
+            renderResults(getCurrentPageItems());
+          }
 
-            if (isSku) {
-              attributes.item = rawValue;
-              attributes.nlp = "";
-            } else {
-              // Treat URLs and text the same - as NLP query
-              attributes.item = "";
-              attributes.nlp = rawValue;
-              attributes.category = categorySelect?.value || "";
-            }
+          if (directResults.length >= TARGET_PRODUCT_COUNT) {
+            showStatus(`Loaded ${allProducts.length} products via Miros API.`, "success");
+            setTimeout(() => clearStatus(), 2000);
+            return;
+          }
 
-            // Configure Miros widget with the current query
-            prepareEntry(attributes);
+          // Configure Miros widget with the current query for overlay fallback
+          prepareEntry(attributes);
 
-            // Wait a bit for Miros widget to inject the AI button
-            showStatus("Opening Miros search...", "pending");
+          const needsOverlay = allProducts.length < TARGET_PRODUCT_COUNT;
+          if (!needsOverlay) {
+            showStatus(`Loaded ${allProducts.length} products via Miros API.`, "success");
+            setTimeout(() => clearStatus(), 2000);
+            return;
+          }
+
+          showStatus(`Loading ${TARGET_PRODUCT_COUNT} products from Miros...`, "pending");
             
             // Try to find and click the AI button immediately, then retry if not found
             const tryOpenOverlay = (attempt = 0) => {
@@ -1817,11 +2422,11 @@
                 const tryScraping = async () => {
                 // CRITICAL: Check max attempts BEFORE incrementing to prevent going over
                 if (scrapeAttempts >= maxScrapeAttempts) {
-                  if (observer) observer.disconnect();
-                  console.error('Failed to find overlay after all attempts. Debug info:');
-                  console.log('All Miros elements:', document.querySelectorAll('[id*="miros"], [class*="miros"], [data-miros]'));
-                  console.log('All dialogs/modals:', document.querySelectorAll('[role="dialog"], .modal, [class*="overlay"]'));
-                  console.log('All links with /p/:', document.querySelectorAll('a[href*="/p/"]'));
+                    if (observer) observer.disconnect();
+                    console.error('Failed to find overlay after all attempts. Debug info:');
+                    console.log('All Miros elements:', document.querySelectorAll('[id*="miros"], [class*="miros"], [data-miros]'));
+                    console.log('All dialogs/modals:', document.querySelectorAll('[role="dialog"], .modal, [class*="overlay"]'));
+                    console.log('All links with /p/:', document.querySelectorAll('a[href*="/p/"]'));
                   
                   // Try one more time with direct link extraction as fallback
                   const allProductLinks = Array.from(document.querySelectorAll('a[href*="/p/"]'))
@@ -1865,14 +2470,25 @@
                     currentPage = 1;
                     updatePagination();
                     renderResults(getCurrentPageItems());
-                    showStatus("Results loaded from direct link extraction!", "info");
-                    setTimeout(() => clearStatus(), 2000);
+                    
+                    // Close overlay after extraction
+                    setTimeout(() => {
+                      closeMirosOverlay();
+                      showStatus(`Loaded ${allProducts.length} products successfully!`, "success");
+                      setTimeout(() => clearStatus(), 2000);
+                    }, 500);
                     return;
                   }
-                  
-                  showStatus("Results not found. Check console for debug info.", "error");
+                    
+                    showStatus("No results found. Try a different URL, SKU, or product attribute.", "error");
                   renderResults([]);
-                  setTimeout(() => clearStatus(), 3000);
+                  
+                  // Close overlay even if no results found
+                  setTimeout(() => {
+                    closeMirosOverlay();
+                  }, 1000);
+                  
+                    setTimeout(() => clearStatus(), 3000);
                   return;
                 }
                 
@@ -1882,12 +2498,11 @@
                   
                   if (success) {
                     if (observer) observer.disconnect();
-                    showStatus("Results loaded successfully!", "info");
-                  // Results section already shown - renderResults() will populate the table
-                    setTimeout(() => clearStatus(), 2000);
+                    // Don't show success message here - it will be shown after scrolling completes
+                    // The scrapeMirosOverlayIntoTable function will handle closing the overlay
                 } else {
                     // Keep trying
-                    showStatus(`Waiting for results... (${scrapeAttempts}/${maxScrapeAttempts})`, "pending");
+                    showStatus(`Waiting for overlay to load... (${scrapeAttempts}/${maxScrapeAttempts})`, "pending");
                     setTimeout(tryScraping, scrapeRetryInterval);
                   }
                 };
