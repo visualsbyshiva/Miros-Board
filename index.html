@@ -459,10 +459,69 @@
           }
         };
 
+        // Merge a batch of products into allProducts (dedup + optional reset)
+        const appendUniqueProducts = (items = [], options = {}) => {
+          const { reset = false, silent = false } = options;
+          if (!Array.isArray(items)) return 0;
+          
+          const normalized = items
+            .filter(Boolean)
+            .map((item) => ({
+              productTitle: item.productTitle || item.title || item.name || '-',
+              optionId: item.optionId || item.option_id || item.itemId || item.item_id || '-',
+              url: item.url || item.productUrl || item.product_url || item.uri || '',
+              imageUrl: item.imageUrl || item.image_url || item.image || item.img || '',
+            }));
+          
+          let baseList = reset ? [] : Array.isArray(allProducts) ? [...allProducts] : [];
+          const seenKeys = new Set(
+            baseList.map((item) => (item.url || item.optionId || '').toLowerCase())
+          );
+          const deduped = normalized.filter((item) => {
+            const key = (item.url || item.optionId || '').toLowerCase();
+            if (key && seenKeys.has(key)) {
+              return false;
+            }
+            if (key) {
+              seenKeys.add(key);
+            }
+            return !!(item.productTitle || item.url || item.optionId);
+          });
+          
+          if (reset) {
+            allProducts = deduped;
+          } else if (deduped.length) {
+            allProducts = [...baseList, ...deduped];
+          }
+          
+          if (reset && deduped.length === 0) {
+            allProducts = [];
+          }
+          
+          currentPage = 1;
+          updatePagination();
+          renderResults(getCurrentPageItems());
+          
+          if (!silent) {
+            if (allProducts.length >= TARGET_PRODUCT_COUNT) {
+              closeMirosOverlay();
+              showStatus(`Loaded ${allProducts.length} products successfully!`, "success");
+              setTimeout(() => clearStatus(), 2000);
+            } else {
+              showStatus(
+                `Loading ${TARGET_PRODUCT_COUNT} products... (${allProducts.length}/${TARGET_PRODUCT_COUNT})`,
+                "pending"
+              );
+            }
+          }
+          
+          return deduped.length;
+        };
+
         // Miros API configuration - using Integration ID only (no API key)
         const MIROS_API_URL = 'https://api.miros.services/graphql';
         const MIROS_INTEGRATION_ID = 'fb97f7d4-fe95-402f-a81a-402cb062eaa3';
-        const MIROS_SLOT = 1; // Default slot for autocomplete suggestions
+        const MIROS_SLOT = 1;
         const MIROS_API_KEY = '0ddbc6c416ae8f61af7079a7892592138e38b9ad5204cf4ec0682b0e8eea16fe';
         const TARGET_PRODUCT_COUNT = 100;
 
@@ -474,11 +533,13 @@
               headers: {
                 'Content-Type': 'application/json',
                 'X-Integration-Id': MIROS_INTEGRATION_ID,
+                'x-miros-integration': MIROS_INTEGRATION_ID,
               },
               body: JSON.stringify({ query, variables }),
             };
             if (MIROS_API_KEY) {
               headers.headers['x-api-key'] = MIROS_API_KEY;
+              headers.headers['x-miros-key'] = MIROS_API_KEY;
             }
             const response = await fetch(MIROS_API_URL, headers);
 
@@ -513,60 +574,78 @@
           }
         }
 
-        const AUTOCOMPLETE_SUGGESTIONS_QUERY = `
-          query AutocompleteSuggestions($integration_id: ID!, $slot: Int!, $query: AutocompleteSuggestionsQuery!) {
-            autocompleteSuggestionsPage(integration_id: $integration_id, slot: $slot, query: $query) {
-              edges {
-                node {
-                  itemId
-                  title
-                  url
-                  imageUrl
-                }
+        const SEARCH_ITEMS_QUERY = `
+          query SearchItems($integration_id: ID!, $text_query: String!, $limit: Int!, $skip: Int!) {
+            search(
+              integration_id: $integration_id,
+              text_query: $text_query,
+              limit: $limit,
+              skip: $skip
+            ) {
+              items {
+                itemId
+                alias
+                title
+                url
+                imageUrl
               }
             }
           }
         `;
 
-        function collectNodesFromAutocomplete(page) {
-          if (!page) return [];
-          if (Array.isArray(page.edges)) {
-            return page.edges.map(edge => edge?.node).filter(Boolean);
-          }
-          return [];
-        }
-
         async function fetchProductsViaAPI(rawValue) {
           if (!MIROS_API_KEY) return [];
+          const searchText = rawValue?.trim();
+          if (!searchText) return [];
 
-          const baseVariables = {
-            integration_id: MIROS_INTEGRATION_ID,
-            slot: MIROS_SLOT,
-          };
+          const aggregated = [];
+          const seenKeys = new Set();
+          const pageSize = 50;
+          const maxPages = 5;
+          let skip = 0;
 
-          const queryStrategies = [
-            { text: rawValue },
-            { q: rawValue },
-          ];
-
-          for (const queryInput of queryStrategies) {
+          for (let page = 0; page < maxPages && aggregated.length < TARGET_PRODUCT_COUNT; page++) {
+            const limit = Math.min(pageSize, TARGET_PRODUCT_COUNT - aggregated.length);
             try {
-              const data = await callMirosAPI(AUTOCOMPLETE_SUGGESTIONS_QUERY, {
-                ...baseVariables,
-                query: queryInput,
+              const data = await callMirosAPI(SEARCH_ITEMS_QUERY, {
+                integration_id: MIROS_INTEGRATION_ID,
+                text_query: searchText,
+                limit,
+                skip,
               });
 
-              const nodes = collectNodesFromAutocomplete(data?.autocompleteSuggestionsPage);
-              if (nodes.length) {
-                const transformed = nodes.map(transformMirosResult);
-                return transformed.slice(0, TARGET_PRODUCT_COUNT);
+              const items = data?.search?.items || [];
+              console.log(`Search query returned ${items.length} items (skip=${skip}, limit=${limit})`);
+
+              if (!items.length) {
+                break;
               }
+
+              for (const item of items) {
+                const normalized = transformMirosResult(item);
+                const key = (normalized.url || normalized.optionId || '').toLowerCase();
+                if (key && seenKeys.has(key)) continue;
+                seenKeys.add(key);
+                aggregated.push(normalized);
+                if (aggregated.length >= TARGET_PRODUCT_COUNT) {
+                  break;
+                }
+              }
+
+              if (items.length < limit) {
+                // No more pages available
+                break;
+              }
+
+              skip += items.length;
             } catch (error) {
-              console.warn('Direct Miros API search failed with query input', queryInput, error);
+              console.error('Search API call failed:', error);
+              break;
             }
           }
 
-          return [];
+          console.log(`Total products fetched from search API: ${aggregated.length}`);
+          return aggregated;
         }
 
         // Introspect GraphQL schema to find ALL available queries
@@ -1133,15 +1212,7 @@
 
           console.log('Scraped items from Miros overlay:', items);
           
-          // Store all products and try to get more if we have less than the target
-          const existingProducts = Array.isArray(allProducts) ? [...allProducts] : [];
-          const existingUrls = new Set(existingProducts.map(item => item.url || item.optionId));
-          const initialNewItems = items.filter(item => {
-            const key = item.url || item.optionId;
-            if (!key) return true;
-            return !existingUrls.has(key);
-          });
-          allProducts = [...existingProducts, ...initialNewItems];
+          appendUniqueProducts(items, { reset: allProducts.length === 0, silent: true });
           
           // Enhanced scrolling to fetch 100+ items
           if (allProducts.length < TARGET_PRODUCT_COUNT) {
@@ -2044,14 +2115,8 @@
           // Method 1: Listen for custom events from widget
           window.addEventListener('miros-results-loaded', (event) => {
             if (event.detail && event.detail.items) {
-              const items = event.detail.items.map(item => ({
-                productTitle: item.title || item.name || '-',
-                optionId: item.optionId || item.option_id || '-',
-                url: item.url || item.productUrl || item.product_url || '',
-                imageUrl: item.imageUrl || item.image_url || item.image || item.img || '',
-              }));
-              renderResults(items);
-              clearStatus();
+              const items = event.detail.items.map(transformMirosResult);
+              appendUniqueProducts(items);
             }
           });
 
@@ -2069,8 +2134,7 @@
                     if (items && items.length > 0) {
                       console.log('Captured items from widget API:', items);
                       const transformed = items.map(transformMirosResult);
-                      renderResults(transformed);
-                      clearStatus();
+                      appendUniqueProducts(transformed);
                     }
                   }
                 }).catch(() => {});
@@ -2124,8 +2188,7 @@
               widget.getResults().then(items => {
                 if (items && items.length > 0) {
                   const transformed = items.map(transformMirosResult);
-                  renderResults(transformed);
-                  clearStatus();
+                  appendUniqueProducts(transformed);
                   return;
                 }
               }).catch(() => {});
@@ -2136,8 +2199,7 @@
               widget.getSuggestions().then(items => {
                 if (items && items.length > 0) {
                   const transformed = items.map(transformMirosResult);
-                  renderResults(transformed);
-                  clearStatus();
+                  appendUniqueProducts(transformed);
                 }
               }).catch(() => {});
             }
@@ -2163,8 +2225,7 @@
                 });
                 
                 if (items.length > 0) {
-                  renderResults(items);
-                  clearStatus();
+                  appendUniqueProducts(items);
                 }
               }
             }
@@ -2337,13 +2398,13 @@
 
         // Main search function
         const performSearch = async () => {
-          clearStatus();
-          const rawValue = searchInput.value.trim();
+            clearStatus();
+            const rawValue = searchInput.value.trim();
 
-          if (!rawValue) {
-            showStatus("Enter a search term or SKU to continue.", "error");
-            return;
-          }
+            if (!rawValue) {
+              showStatus("Enter a search term or SKU to continue.", "error");
+              return;
+            }
 
           // CRITICAL: Transition to STATE 2 immediately when search is clicked
           if (!hasSearched) {
@@ -2352,44 +2413,45 @@
 
           prepareResultsForNewSearch();
 
-          const isSku = /^[A-Za-z0-9_-]+$/.test(rawValue);
-          const attributes = {};
+            const isSku = /^[A-Za-z0-9_-]+$/.test(rawValue);
+            const attributes = {};
 
-          if (isSku) {
-            attributes.item = rawValue;
-            attributes.nlp = "";
-          } else {
-            attributes.item = "";
-            attributes.nlp = rawValue;
-            attributes.category = categorySelect?.value || "";
-          }
+            if (isSku) {
+              attributes.item = rawValue;
+              attributes.nlp = "";
+            } else {
+              attributes.item = "";
+              attributes.nlp = rawValue;
+              attributes.category = categorySelect?.value || "";
+            }
 
           // Try direct API fetch first (guarantees up to 100 items when available)
           let directResults = [];
           if (MIROS_API_KEY) {
             showStatus("Fetching products via Miros API...", "pending");
             try {
+              console.log('=== Starting direct API fetch with limit: 100 ===');
               directResults = await fetchProductsViaAPI(rawValue);
+              console.log(`API fetch returned ${directResults.length} products`);
             } catch (error) {
-              console.warn('Direct Miros API fetch failed, falling back to widget overlay.', error);
+              console.error('Direct Miros API fetch failed, falling back to widget overlay.', error);
             }
           }
 
           if (directResults.length) {
-            allProducts = directResults;
-            currentPage = 1;
-            updatePagination();
-            renderResults(getCurrentPageItems());
+            console.log(`Adding ${directResults.length} products from API to table`);
+            appendUniqueProducts(directResults, { reset: true, silent: true });
+            console.log(`Total products after API fetch: ${allProducts.length}`);
           }
 
-          if (directResults.length >= TARGET_PRODUCT_COUNT) {
+          if (allProducts.length >= TARGET_PRODUCT_COUNT) {
             showStatus(`Loaded ${allProducts.length} products via Miros API.`, "success");
             setTimeout(() => clearStatus(), 2000);
             return;
           }
 
           // Configure Miros widget with the current query for overlay fallback
-          prepareEntry(attributes);
+            prepareEntry(attributes);
 
           const needsOverlay = allProducts.length < TARGET_PRODUCT_COUNT;
           if (!needsOverlay) {
