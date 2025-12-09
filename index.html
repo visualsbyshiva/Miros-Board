@@ -405,6 +405,7 @@
               optionId = "-",
               url = "",
               imageUrl = "",
+              brand = "",
             } = item;
 
             const productId = deriveProductIdFromSource(url, optionId);
@@ -419,13 +420,19 @@
               : "-";
 
             const imageHtml = imageUrl
-              ? `<img src="${imageUrl}" alt="${productTitle}" style="max-width: 100px; max-height: 100px; object-fit: contain;" />`
+              ? `<img src="${imageUrl}" alt="${productTitle}" style="width: 100px; height: 100px; object-fit: contain; display: block;" />`
               : "-";
+
+            // Display brand above product title if available
+            const brandHtml = brand 
+              ? `<div style="font-weight: 600; color: #333; margin-bottom: 4px; font-size: 0.9em;">${brand}</div>` 
+              : '';
+            const titleWithBrand = brandHtml + `<div>${productTitle}</div>`;
 
             return `
               <tr>
                 <td>${imageHtml}</td>
-                <td>${productTitle}</td>
+                <td>${titleWithBrand}</td>
                 <td>${productId}</td>
                 <td>${safeUrl}</td>
               </tr>
@@ -485,6 +492,7 @@
               optionId: item.optionId || item.option_id || item.itemId || item.item_id || '-',
               url: item.url || item.productUrl || item.product_url || item.uri || '',
               imageUrl: item.imageUrl || item.image_url || item.image || item.img || '',
+              brand: item.brand || item.brandName || '',
             }));
           
           let baseList = reset ? [] : Array.isArray(allProducts) ? [...allProducts] : [];
@@ -699,6 +707,7 @@
                     optionId: item.id || item.alias || '-',
                     url: item.url || '',
                     imageUrl: item.image || item.image_optimized || '',
+                    brand: item.brand || '',
                   };
                   
                   const key = (normalized.url || normalized.optionId || '').toLowerCase().trim();
@@ -768,6 +777,7 @@
             optionId: item.optionId || item.option_id || item.itemId || item.item_id || item.id || item._id || '-',
             url: item.url || item.productUrl || item.product_url || item.uri || item.link || item.href || '',
             imageUrl: item.imageUrl || item.image_url || item.image || item.img || item.imageUrl || item.thumbnail || '',
+            brand: item.brand || item.brandName || '',
           };
         }
 
