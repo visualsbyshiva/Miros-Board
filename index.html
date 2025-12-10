@@ -70,7 +70,7 @@
         <div
           id="mirosEntry"
           data-miros-entry="miros-on-search"
-          aria-hidden="true"
+          class="miros-entry-wrapper"
         ></div>
             </div>
             <input
@@ -92,31 +92,44 @@
             </span>
           </div>
           <div class="results-grid-wrapper" role="region" aria-live="polite">
-            <table class="results-grid" id="resultsGrid">
-              <thead>
-                <tr>
-                  <th scope="col">Product Image</th>
-                  <th scope="col">Product Title</th>
-                  <th scope="col">SKU / Product ID</th>
-                  <th scope="col">Product URL</th>
-                </tr>
-              </thead>
-              <tbody id="resultsBody">
-                <tr>
-                  <td colspan="4" class="results-empty">
-                    Waiting for your first search…
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+            <div class="results-cards-grid" id="resultsBody">
+              <div class="results-empty">
+                Waiting for your first search…
+              </div>
+            </div>
           </div>
         </div>
       </section>
       <footer class="dashboard__footer" id="dashboardFooter">
-        <div class="dashboard__pagination" id="paginationContainer"></div>
-        <div class="dashboard__footer-actions">
-          <button type="button" class="dashboard__button dashboard__button--ghost" id="clearResultsButton">Clear Results</button>
-          <button type="button" class="dashboard__button dashboard__button--primary" id="downloadButton">Export as CSV</button>
+        <div class="selected-filters-container" id="selectedFiltersContainer" style="display: none;"></div>
+        <div class="dashboard__footer-main-row">
+          <div class="filters-container" id="filtersContainer" style="display: flex;">
+            <div class="filter-group">
+              <label class="filter-label">Brand</label>
+              <div class="filter-multiselect" id="brandFilter">
+                <div class="filter-multiselect__selected" id="brandFilterSelected">
+                  <span class="filter-placeholder">Select brands...</span>
+                </div>
+                <div class="filter-multiselect__dropdown" id="brandFilterDropdown" style="display: none;">
+                  <div class="filter-multiselect__search">
+                    <input type="text" id="brandFilterSearch" placeholder="Search brands..." class="filter-search-input">
+                  </div>
+                  <div class="filter-multiselect__options" id="brandFilterOptions"></div>
+                </div>
+              </div>
+            </div>
+            
+            <button type="button" class="filter-clear-btn" id="clearFiltersBtn" style="display: none;">
+              Clear Filters
+            </button>
+          </div>
+          <div class="dashboard__footer-bottom-row">
+            <div class="dashboard__pagination" id="paginationContainer"></div>
+            <div class="dashboard__footer-actions">
+              <button type="button" class="dashboard__button dashboard__button--ghost" id="clearResultsButton">Clear Results</button>
+              <button type="button" class="dashboard__button dashboard__button--primary" id="downloadButton">Export as CSV</button>
+            </div>
+          </div>
         </div>
       </footer>
     </main>
@@ -129,6 +142,27 @@
         const categorySelect = document.getElementById("categorySelect");
         const mirosEntry = document.getElementById("mirosEntry");
         const statusMessage = document.getElementById("statusMessage");
+        
+        // Show Miros entry button after search
+        const showMirosEntryButton = () => {
+          if (mirosEntry) {
+            mirosEntry.classList.add('visible');
+            // Use MutationObserver to watch for button injection by Miros widget
+            const observer = new MutationObserver((mutations) => {
+              mutations.forEach((mutation) => {
+                if (mutation.addedNodes.length > 0) {
+                  // Button was injected, ensure it's visible
+                  const button = mirosEntry.querySelector('button, [class*="miros"]');
+                  if (button) {
+                    button.style.display = 'flex';
+                    observer.disconnect();
+                  }
+                }
+              });
+            });
+            observer.observe(mirosEntry, { childList: true, subtree: true });
+          }
+        };
         const resultsSummary = document.getElementById("resultsSummary");
         const resultsSummaryText = document.getElementById("resultsSummaryText");
         const resultsBody = document.getElementById("resultsBody");
@@ -142,12 +176,17 @@
         let hasSearched = false;
         let isFocusMode = false;
         let allProducts = []; // Store all scraped products
+        let originalProducts = []; // Store original unfiltered products
         let displayedProductsCount = 0; // Track how many products are currently displayed
         const itemsPerLoad = 50; // Load 50 products at a time when scrolling
         let isLoadingMore = false; // Prevent multiple simultaneous loads
         let statusHideTimer = null;
         let lastStatusUpdate = 0;
         let lastStatusText = "";
+        
+        // Filter state
+        let selectedBrands = new Set();
+        let allBrands = new Set();
 
         // STATE 1: Initial State - hide results on first load
         if (dashboardResults) {
@@ -225,6 +264,12 @@
             });
           }
           
+          // Show filters container when footer becomes visible
+          const filtersContainer = document.getElementById('filtersContainer');
+          if (filtersContainer) {
+            filtersContainer.style.display = 'flex';
+          }
+          
           // Exit focus mode if active
           exitFocusMode();
         };
@@ -258,20 +303,97 @@
             }, 200);
           });
 
-          // Auto-detect paste and trigger search
-          searchInput.addEventListener('paste', (e) => {
-            setTimeout(() => {
-              const pastedValue = searchInput.value.trim();
-              if (pastedValue && (pastedValue.startsWith('http') || pastedValue.includes('/p/'))) {
-                // Auto-trigger search for URLs
-                if (searchBtn) {
-                  setTimeout(() => {
-                    searchBtn.click();
-                  }, 100);
-                }
+          // Handle paste events - both on input and document level for better image paste support
+          const handlePaste = async (e) => {
+            // Only handle if search input is focused or if it's a document-level paste
+            const isInputFocused = document.activeElement === searchInput;
+            const isDocumentPaste = e.target === document.body || e.target === document.documentElement;
+            
+            if (!isInputFocused && !isDocumentPaste) {
+              return;
+            }
+            
+            // Check if an image was pasted
+            const clipboardData = e.clipboardData || window.clipboardData;
+            if (!clipboardData) return;
+            
+            const items = clipboardData.items || clipboardData.files;
+            if (!items || items.length === 0) return;
+            
+            let imageFile = null;
+            
+            // Check for image in clipboard items
+            for (let i = 0; i < items.length; i++) {
+              const item = items[i];
+              if (item.type && item.type.indexOf('image') !== -1) {
+                imageFile = item.getAsFile ? item.getAsFile() : item;
+                break;
               }
-            }, 10);
-          });
+            }
+            
+            // If image found, process it
+            if (imageFile) {
+              e.preventDefault();
+              e.stopPropagation();
+              
+              try {
+                showStatus("Processing pasted image…", "pending");
+                
+                // Clear the input field since we're using image
+                if (searchInput) {
+                  searchInput.value = '';
+                }
+                
+                // Process the image
+                const { imageUrl } = await uploadImageToMiros(imageFile);
+                console.log('Image pasted successfully, data URL length:', imageUrl?.length);
+                
+                // Show results section if not already shown
+                if (!hasSearched) {
+                  showResultsSection();
+                }
+                
+                prepareResultsForNewSearch();
+                
+                // For now, show a message that image search needs API implementation
+                // In the future, this would call a Miros image search API
+                showStatus("Image pasted successfully. Image search via API is not yet fully implemented. Please use text/SKU search for now.", "info");
+                
+                // TODO: When Miros image search API is available, call it here:
+                // const results = await fetchProductsViaImageAPI(imageUrl);
+                // appendUniqueProducts(results, { reset: true, silent: false });
+                
+                setTimeout(() => clearStatus(), 4000);
+              } catch (error) {
+                console.error('Error processing pasted image:', error);
+                showStatus("Unable to process pasted image. Please try again.", "error");
+                setTimeout(() => clearStatus(), 3000);
+              }
+              return;
+            }
+            
+            // Handle text paste (only if input is focused)
+            if (isInputFocused) {
+              setTimeout(() => {
+                const pastedValue = searchInput.value.trim();
+                if (pastedValue && (pastedValue.startsWith('http') || pastedValue.includes('/p/'))) {
+                  // Auto-trigger search for URLs
+                  if (searchBtn) {
+                    setTimeout(() => {
+                      searchBtn.click();
+                    }, 100);
+                  }
+                }
+              }, 10);
+            }
+          };
+          
+          // Add paste listener to input
+          searchInput.addEventListener('paste', handlePaste);
+          
+          // Also add document-level listener as fallback for image paste
+          // This helps when paste happens but input might not have focus
+          document.addEventListener('paste', handlePaste, true);
 
           const triggerSearchOnEnter = (e) => {
             if (e.key === 'Enter') {
@@ -374,15 +496,29 @@
         // This helper resets the table so we are not showing old items by mistake.
         const clearResults = () => {
           allProducts = [];
+          originalProducts = [];
           displayedProductsCount = 0;
+          selectedBrands.clear();
+          allBrands.clear();
           if (resultsBody) {
             resultsBody.innerHTML =
-              '<tr><td colspan="4" class="results-empty">Results cleared. Run a new search to see recommendations.</td></tr>';
+              '<div class="results-empty">Results cleared. Run a new search to see recommendations.</div>';
           }
           if (resultsSummaryText) {
             resultsSummaryText.textContent =
               "Results cleared. Enter a new search term, SKU ID, or upload an image to refresh.";
           }
+          // Keep filters container visible even when clearing results
+          const filtersContainer = document.getElementById('filtersContainer');
+          if (filtersContainer) {
+            filtersContainer.style.display = 'flex';
+          }
+          const selectedFiltersContainer = document.getElementById('selectedFiltersContainer');
+          if (selectedFiltersContainer) {
+            selectedFiltersContainer.style.display = 'none';
+            selectedFiltersContainer.innerHTML = '';
+          }
+          updateFilterUI();
           updatePaginationInfo();
           // Keep results section visible in STATE 2, just clear the data
         };
@@ -390,16 +526,29 @@
         // Prepare UI for a brand-new search request (clears table)
         const prepareResultsForNewSearch = () => {
           allProducts = [];
+          originalProducts = [];
           displayedProductsCount = 0;
+          selectedBrands.clear();
           if (resultsBody) {
             resultsBody.innerHTML =
-              '<tr><td colspan="4" class="results-empty">Searching Miros for matching products...</td></tr>';
+              '<div class="results-empty">Searching Miros for matching products...</div>';
           }
+          // Keep filters container visible at all times
+          const filtersContainer = document.getElementById('filtersContainer');
+          if (filtersContainer) {
+            filtersContainer.style.display = 'flex';
+          }
+          const selectedFiltersContainer = document.getElementById('selectedFiltersContainer');
+          if (selectedFiltersContainer) {
+            selectedFiltersContainer.style.display = 'none';
+            selectedFiltersContainer.innerHTML = '';
+          }
+          updateFilterUI();
           updatePaginationInfo();
         };
 
-        // Helper to create a table row HTML
-        const createProductRow = (item) => {
+        // Helper to create a product card HTML
+        const createProductCard = (item) => {
             const {
               productTitle = "-",
               optionId = "-",
@@ -409,33 +558,37 @@
             } = item;
 
             const productId = deriveProductIdFromSource(url, optionId);
-
-            // Truncate URL to 20-25 characters
-            let displayUrl = url;
-            if (url && url.length > 25) {
-              displayUrl = url.substring(0, 22) + '...';
-            }
-            const safeUrl = url
-              ? `<a href="${url}" target="_blank" rel="noopener noreferrer" title="${url}">${displayUrl}</a>`
-              : "-";
-
+            
             const imageHtml = imageUrl
-              ? `<img src="${imageUrl}" alt="${productTitle}" style="width: 100px; height: 100px; object-fit: contain; display: block;" />`
-              : "-";
+              ? `<img src="${imageUrl}" alt="${productTitle}" class="product-card__image" />`
+              : '<div class="product-card__image product-card__image--placeholder">No Image</div>';
 
-            // Display brand above product title if available
             const brandHtml = brand 
-              ? `<div style="font-weight: 600; color: #333; margin-bottom: 4px; font-size: 0.9em;">${brand}</div>` 
+              ? `<div class="product-card__brand">${brand}</div>` 
               : '';
-            const titleWithBrand = brandHtml + `<div>${productTitle}</div>`;
+            
+            const linkIconHtml = url
+              ? `<a href="${url}" target="_blank" rel="noopener noreferrer" class="product-card__link" title="View product" aria-label="View product">
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M15 10.8333V15.8333C15 16.2754 14.8244 16.6993 14.5118 17.0118C14.1993 17.3244 13.7754 17.5 13.3333 17.5H4.16667C3.72464 17.5 3.30072 17.3244 2.98816 17.0118C2.67559 16.6993 2.5 16.2754 2.5 15.8333V6.66667C2.5 6.22464 2.67559 5.80072 2.98816 5.48816C3.30072 5.17559 3.72464 5 4.16667 5H9.16667" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M12.5 2.5H17.5V7.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M8.33334 11.6667L17.5 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </a>`
+              : '';
 
             return `
-              <tr>
-                <td>${imageHtml}</td>
-                <td>${titleWithBrand}</td>
-                <td>${productId}</td>
-                <td>${safeUrl}</td>
-              </tr>
+              <div class="product-card">
+                <div class="product-card__image-wrapper">
+                  ${imageHtml}
+                </div>
+                <div class="product-card__content">
+                  ${brandHtml}
+                  <div class="product-card__title">${productTitle}</div>
+                  <div class="product-card__id">${productId}</div>
+                  ${linkIconHtml}
+                </div>
+              </div>
             `;
         };
 
@@ -446,7 +599,7 @@
           // If no items but we have allProducts, show empty message
           if (!items.length && allProducts.length === 0) {
             resultsBody.innerHTML =
-              '<tr><td colspan="4" class="results-empty">No results found. Try a different URL, SKU, or product attribute.</td></tr>';
+              '<div class="results-empty">No results found. Try a different URL, SKU, or product attribute.</div>';
             summariseResults(0);
             return;
           }
@@ -454,23 +607,23 @@
           // If no items for current page but we have products, show message
           if (!items.length && allProducts.length > 0 && !append) {
             resultsBody.innerHTML =
-              '<tr><td colspan="4" class="results-empty">No results found. Try a different URL, SKU, or product attribute.</td></tr>';
+              '<div class="results-empty">No results found. Try a different URL, SKU, or product attribute.</div>';
             summariseResults(allProducts.length);
             return;
           }
 
-          // If appending, add to existing rows
+          // If appending, add to existing cards
           if (append && items.length > 0) {
-            const rows = items.map(createProductRow);
-            resultsBody.insertAdjacentHTML('beforeend', rows.join(""));
+            const cards = items.map(createProductCard);
+            resultsBody.insertAdjacentHTML('beforeend', cards.join(""));
             summariseResults(allProducts.length);
             updatePaginationInfo();
             return;
           }
 
           // Initial render or full refresh
-          const rows = items.map(createProductRow);
-          resultsBody.innerHTML = rows.join("");
+          const cards = items.map(createProductCard);
+          resultsBody.innerHTML = cards.join("");
           summariseResults(allProducts.length);
           updatePaginationInfo();
           
@@ -493,6 +646,7 @@
               url: item.url || item.productUrl || item.product_url || item.uri || '',
               imageUrl: item.imageUrl || item.image_url || item.image || item.img || '',
               brand: item.brand || item.brandName || '',
+              color: item.color_name || item.color || item.colour || item.colour_name || '',
             }));
           
           let baseList = reset ? [] : Array.isArray(allProducts) ? [...allProducts] : [];
@@ -523,6 +677,9 @@
           }
           
           // Initialize infinite scroll with new products
+          // Store original products for filtering
+          originalProducts = [...allProducts];
+          
           if (reset || displayedProductsCount === 0) {
             initializeInfiniteScroll();
           } else {
@@ -531,6 +688,9 @@
             summariseResults(allProducts.length);
             updatePaginationInfo();
           }
+          
+          // Extract filter options after products are added
+          extractFilterOptions();
           
           if (!silent) {
               showStatus(`Loaded ${allProducts.length} products successfully!`, "success");
@@ -708,6 +868,7 @@
                     url: item.url || '',
                     imageUrl: item.image || item.image_optimized || '',
                     brand: item.brand || '',
+                    color: item.color_name || item.color || '',
                   };
                   
                   const key = (normalized.url || normalized.optionId || '').toLowerCase().trim();
@@ -778,6 +939,7 @@
             url: item.url || item.productUrl || item.product_url || item.uri || item.link || item.href || '',
             imageUrl: item.imageUrl || item.image_url || item.image || item.img || item.imageUrl || item.thumbnail || '',
             brand: item.brand || item.brandName || '',
+            color: item.color_name || item.color || item.colour || item.colour_name || '',
           };
         }
 
@@ -1413,14 +1575,14 @@
               const showLoadingInTable = () => {
                 const resultsBody = document.getElementById('resultsBody');
                 if (resultsBody) {
-                  resultsBody.innerHTML = `<tr><td colspan="4" class="results-empty" style="text-align: center; padding: 40px;">
+                  resultsBody.innerHTML = `<div class="results-empty" style="text-align: center; padding: 40px;">
                     <div style="font-size: 16px; color: var(--text-secondary); margin-bottom: 10px;">
                       Loading products from overlay...
                     </div>
                     <div style="font-size: 14px; color: var(--text-muted);">
                       ${allProducts.length} products fetched
                     </div>
-                  </td></tr>`;
+                  </div>`;
                 }
               };
               
@@ -1674,14 +1836,14 @@
                   // Update loading message
                   showStatus(`Fetching products from overlay... (${allProducts.length} products fetched)`, "pending");
                   if (resultsBody) {
-                    resultsBody.innerHTML = `<tr><td colspan="4" class="results-empty" style="text-align: center; padding: 40px;">
+                    resultsBody.innerHTML = `<div class="results-empty" style="text-align: center; padding: 40px;">
                       <div style="font-size: 16px; color: var(--text-secondary); margin-bottom: 10px;">
                         Loading products from overlay...
                       </div>
                       <div style="font-size: 14px; color: var(--text-muted);">
                         ${allProducts.length}/${targetItems} products fetched
                       </div>
-                    </td></tr>`;
+                    </div>`;
                   }
                 }
                 
@@ -2336,6 +2498,285 @@
         };
         */
 
+        // Extract unique brands from products
+        function extractFilterOptions() {
+          allBrands.clear();
+          
+          originalProducts.forEach(product => {
+            if (product.brand && product.brand.trim()) {
+              allBrands.add(product.brand.trim());
+            }
+          });
+          
+          // Debug logging
+          console.log('Extracted brands:', Array.from(allBrands));
+          
+          // Sort alphabetically
+          const sortedBrands = Array.from(allBrands).sort();
+          
+          populateFilterOptions('brand', sortedBrands);
+          
+          // Filters container is always visible when footer is visible
+          // No need to conditionally show/hide it based on products
+        }
+
+        // Populate filter dropdown options
+        function populateFilterOptions(type, options) {
+          const optionsContainer = document.getElementById(`${type}FilterOptions`);
+          const searchInput = document.getElementById(`${type}FilterSearch`);
+          if (!optionsContainer) {
+            console.error(`Filter options container not found: ${type}FilterOptions`);
+            return;
+          }
+          
+          console.log(`Populating ${type} filter with ${options.length} options:`, options);
+          
+          optionsContainer.innerHTML = '';
+          
+          // If no options, show a message
+          if (options.length === 0) {
+            const noOptionsMsg = document.createElement('div');
+            noOptionsMsg.className = 'filter-option';
+            noOptionsMsg.style.padding = 'var(--spacing-sm)';
+            noOptionsMsg.style.color = 'var(--color-text-tertiary)';
+            noOptionsMsg.style.fontStyle = 'italic';
+            noOptionsMsg.textContent = `No ${type} options available`;
+            optionsContainer.appendChild(noOptionsMsg);
+            return;
+          }
+          
+          options.forEach(option => {
+            const optionEl = document.createElement('div');
+            optionEl.className = 'filter-option';
+            
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.id = `${type}-${option}`;
+            checkbox.value = option;
+            checkbox.checked = (type === 'brand' ? selectedBrands : new Set()).has(option);
+            if (checkbox.checked) {
+              optionEl.classList.add('selected');
+            }
+            
+            checkbox.addEventListener('change', (e) => {
+              const value = e.target.value;
+              if (type === 'brand') {
+                if (e.target.checked) {
+                  selectedBrands.add(value);
+                } else {
+                  selectedBrands.delete(value);
+                }
+              }
+              updateFilterUI();
+              applyFilters();
+            });
+            
+            const label = document.createElement('label');
+            label.htmlFor = `${type}-${option}`;
+            label.textContent = option;
+            
+            optionEl.appendChild(checkbox);
+            optionEl.appendChild(label);
+            optionsContainer.appendChild(optionEl);
+          });
+          
+          // Add search functionality
+          if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+              const searchTerm = e.target.value.toLowerCase();
+              Array.from(optionsContainer.children).forEach(optionEl => {
+                const label = optionEl.querySelector('label');
+                const matches = label.textContent.toLowerCase().includes(searchTerm);
+                optionEl.style.display = matches ? 'flex' : 'none';
+              });
+            });
+          }
+        }
+
+        // Update filter UI (selected tags, clear button)
+        function updateFilterUI() {
+          // Update brand filter selected display
+          updateFilterSelectedDisplay('brand', selectedBrands);
+          
+          // Show/hide clear button
+          const clearBtn = document.getElementById('clearFiltersBtn');
+          if (clearBtn) {
+            clearBtn.style.display = (selectedBrands.size > 0) ? 'block' : 'none';
+          }
+        }
+
+        function updateFilterSelectedDisplay(type, selectedSet) {
+          const selectedContainer = document.getElementById(`${type}FilterSelected`);
+          const selectedFiltersContainer = document.getElementById('selectedFiltersContainer');
+          
+          // Always show placeholder in dropdown trigger when closed
+          if (selectedContainer) {
+            const placeholder = selectedContainer.querySelector('.filter-placeholder');
+            const textContainer = selectedContainer.querySelector('.filter-multiselect__selected-text');
+            
+            // Remove any tags from inside the dropdown trigger
+            if (textContainer) {
+              textContainer.innerHTML = '';
+            }
+            
+            // Always show placeholder in dropdown trigger
+            if (placeholder) {
+              placeholder.style.display = 'block';
+              if (selectedSet.size > 0) {
+                placeholder.textContent = `${selectedSet.size} selected`;
+              } else {
+                placeholder.textContent = 'Select brands...';
+              }
+            }
+          }
+          
+          // Render selected tags in the external container
+          if (!selectedFiltersContainer) return;
+          
+          // Clear existing tags for this filter type
+          const existingTags = selectedFiltersContainer.querySelectorAll(`[data-filter-type="${type}"]`);
+          existingTags.forEach(tag => tag.remove());
+          
+          if (selectedSet.size === 0) {
+            // Hide container if no filters selected
+            const hasAnyFilters = selectedFiltersContainer.children.length > 0;
+            if (!hasAnyFilters) {
+              selectedFiltersContainer.style.display = 'none';
+            }
+          } else {
+            // Show container
+            selectedFiltersContainer.style.display = 'flex';
+            
+            // Create tags for selected filters
+            selectedSet.forEach(value => {
+              const tag = document.createElement('span');
+              tag.className = 'filter-tag';
+              tag.setAttribute('data-filter-type', type);
+              tag.innerHTML = `
+                ${value}
+                <button type="button" class="filter-tag__remove" data-type="${type}" data-value="${value}">×</button>
+              `;
+              selectedFiltersContainer.appendChild(tag);
+            });
+            
+            // Add remove handlers
+            selectedFiltersContainer.querySelectorAll('.filter-tag__remove').forEach(btn => {
+              // Remove existing listeners by cloning
+              const newBtn = btn.cloneNode(true);
+              btn.parentNode.replaceChild(newBtn, btn);
+              
+              newBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const filterType = newBtn.dataset.type;
+                const filterValue = newBtn.dataset.value;
+                if (filterType === 'brand') {
+                  selectedBrands.delete(filterValue);
+                }
+                updateFilterUI();
+                applyFilters();
+              });
+            });
+          }
+        }
+
+        // Apply filters to products
+        function applyFilters() {
+          let filtered = originalProducts.length > 0 ? originalProducts : allProducts;
+          
+          // Apply brand filter
+          if (selectedBrands.size > 0) {
+            filtered = filtered.filter(product => {
+              const brand = (product.brand || '').trim();
+              return brand && selectedBrands.has(brand);
+            });
+          }
+          
+          // Update displayed products with filtered results
+          displayedProductsCount = 0;
+          allProducts = filtered; // Use filtered for rendering
+          initializeInfiniteScroll();
+        }
+
+        // Setup filter dropdown toggles
+        function setupFilterDropdowns() {
+          ['brand'].forEach(type => {
+            const selectedEl = document.getElementById(`${type}FilterSelected`);
+            const dropdownEl = document.getElementById(`${type}FilterDropdown`);
+            
+            if (selectedEl && dropdownEl) {
+              selectedEl.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isOpen = dropdownEl.style.display !== 'none';
+                
+                // Close all dropdowns
+                document.querySelectorAll('.filter-multiselect__dropdown').forEach(dd => {
+                  dd.style.display = 'none';
+                  dd.classList.remove('dropdown-above');
+                });
+                document.querySelectorAll('.filter-multiselect__selected').forEach(sel => {
+                  sel.classList.remove('active');
+                });
+                
+                if (!isOpen) {
+                  dropdownEl.style.display = 'flex';
+                  selectedEl.classList.add('active');
+                  
+                  // Check if dropdown would go below viewport, position above if needed
+                  setTimeout(() => {
+                    const rect = selectedEl.getBoundingClientRect();
+                    const dropdownHeight = dropdownEl.offsetHeight || 300; // Default max height
+                    const spaceBelow = window.innerHeight - rect.bottom;
+                    const spaceAbove = rect.top;
+                    
+                    // If not enough space below but enough space above, position above
+                    if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
+                      dropdownEl.classList.add('dropdown-above');
+                    } else {
+                      dropdownEl.classList.remove('dropdown-above');
+                    }
+                  }, 10);
+                }
+              });
+            }
+          });
+          
+          // Close dropdowns when clicking outside
+          document.addEventListener('click', (e) => {
+            if (!e.target.closest('.filter-multiselect')) {
+              document.querySelectorAll('.filter-multiselect__dropdown').forEach(dd => {
+                dd.style.display = 'none';
+              });
+              document.querySelectorAll('.filter-multiselect__selected').forEach(sel => {
+                sel.classList.remove('active');
+              });
+            }
+          });
+          
+          // Clear filters button
+          const clearBtn = document.getElementById('clearFiltersBtn');
+          if (clearBtn) {
+            clearBtn.addEventListener('click', () => {
+              selectedBrands.clear();
+              
+              // Uncheck all brand filter checkboxes
+              const brandFilterOptions = document.getElementById('brandFilterOptions');
+              if (brandFilterOptions) {
+                const checkboxes = brandFilterOptions.querySelectorAll('input[type="checkbox"]');
+                checkboxes.forEach(checkbox => {
+                  checkbox.checked = false;
+                  const optionEl = checkbox.closest('.filter-option');
+                  if (optionEl) {
+                    optionEl.classList.remove('selected');
+                  }
+                });
+              }
+              
+              updateFilterUI();
+              applyFilters();
+            });
+          }
+        }
+
         // Upload image and get data URL (no backend needed - widget handles it)
         const uploadImageToMiros = async (file) => {
           return new Promise((resolve, reject) => {
@@ -2366,16 +2807,27 @@
             if (!file) return;
 
             try {
-              showStatus("Searching by image…", "pending");
+              showStatus("Processing image…", "pending");
+              
+              // Show results section if not already shown
+              if (!hasSearched) {
+                showResultsSection();
+              }
+              
+              prepareResultsForNewSearch();
+              
               const { imageUrl } = await uploadImageToMiros(file);
+              console.log('Image uploaded successfully, data URL length:', imageUrl?.length);
               
-              // For image search, we'd need to use Miros image search API
-              // This is a placeholder - you may need to implement image upload endpoint
-              // or use Miros image search GraphQL mutation
-              showStatus("Image search not yet implemented via direct API. Please use text/SKU search.", "error");
+              // For now, show a message that image search needs API implementation
+              // In the future, this would call a Miros image search API
+              showStatus("Image uploaded successfully. Image search via API is not yet fully implemented. Please use text/SKU search for now.", "info");
               
-              // TODO: Implement image search via Miros GraphQL if available
-              // Example: mutation { searchByImage(imageUrl: $imageUrl, limit: 15) { ... } }
+              // TODO: When Miros image search API is available, call it here:
+              // const results = await fetchProductsViaImageAPI(imageUrl);
+              // appendUniqueProducts(results, { reset: true, silent: false });
+              
+              setTimeout(() => clearStatus(), 4000);
               
             } catch (error) {
               console.error(error);
@@ -2383,6 +2835,7 @@
                 "Unable to process image. Please try again.",
                 "error",
               );
+              setTimeout(() => clearStatus(), 3000);
             } finally {
               fileInput.value = "";
             }
@@ -2428,7 +2881,11 @@
               console.log(`📊 FINAL COUNT: ${allProducts.length} total products fetched and stored`);
               console.log(`💡 To check products anytime, type in console: allProducts.length`);
               showStatus(`Successfully loaded ${allProducts.length} products via Miros API.`, "success");
-                    setTimeout(() => clearStatus(), 3000);
+              // Show Miros entry button after successful search
+              setTimeout(() => {
+                showMirosEntryButton();
+              }, 500);
+              setTimeout(() => clearStatus(), 3000);
                 } else {
               console.log(`⚠️ No products found for search: "${rawValue}"`);
               showStatus("No results found. Try a different search term or SKU.", "error");
@@ -2460,17 +2917,8 @@
         if (downloadButton) {
           downloadButton.addEventListener("click", () => {
             try {
-              const rows = resultsBody.querySelectorAll("tr");
-              if (!rows || rows.length === 0 || (rows.length === 1 && rows[0].querySelector(".results-empty"))) {
+              if (allProducts.length === 0) {
                 showStatus("No results to download.", "error");
-                setTimeout(() => clearStatus(), 2000);
-                return;
-              }
-
-              const dataRows = Array.from(rows).filter(row => !row.querySelector(".results-empty"));
-
-              if (!dataRows.length) {
-                showStatus("No data to download.", "error");
                 setTimeout(() => clearStatus(), 2000);
                 return;
               }
@@ -2481,27 +2929,20 @@
                 return;
               }
 
-              // Get all headers but exclude the first one (Product Image)
-              const allHeaders = Array.from(document.querySelectorAll(".results-grid thead th")).map(
-                (th) => th.textContent.trim()
-              );
-              const headers = allHeaders.slice(1); // Skip first column (Product Image)
+              // Headers for CSV export
+              const headers = ["Product Title", "Brand", "SKU / Product ID", "Product URL", "Image URL"];
 
               // Export ALL fetched products (up to 5,000), not just what's currently displayed
               // This ensures users get the complete dataset in CSV even if they haven't scrolled through all products
               const data = allProducts.map((item) => {
                 const productId = deriveProductIdFromSource(item.url, item.optionId);
                 
-                // Truncate URL for display
-                let displayUrl = item.url;
-                if (item.url && item.url.length > 25) {
-                  displayUrl = item.url.substring(0, 22) + '...';
-                }
-                
                 return [
                   item.productTitle || "-",
+                  item.brand || "-",
                   productId || "-",
-                  item.url || "-"
+                  item.url || "-",
+                  item.imageUrl || "-"
                 ];
               });
 
@@ -2534,6 +2975,9 @@
 
         // Initialize widget listener when page loads
         setupMirosWidgetListener();
+
+        // Initialize filter dropdowns
+        setupFilterDropdowns();
 
         // Initialize infinite scroll when page loads
         if (document.readyState === 'loading') {
