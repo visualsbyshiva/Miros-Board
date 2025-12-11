@@ -33,6 +33,11 @@
                   aria-label="Search for a product attribute"
                 />
               </div>
+              <div
+                id="mirosEntryLanding"
+                data-miros-entry="miros-on-search"
+                class="miros-entry-wrapper"
+              ></div>
             </div>
           </div>
         </div>
@@ -100,6 +105,21 @@
               </div>
             </div>
             
+            <div class="filter-group">
+              <label class="filter-label">Color</label>
+              <div class="filter-multiselect" id="colorFilter">
+                <div class="filter-multiselect__selected" id="colorFilterSelected">
+                  <span class="filter-placeholder">Select colors...</span>
+                </div>
+                <div class="filter-multiselect__dropdown" id="colorFilterDropdown" style="display: none;">
+                  <div class="filter-multiselect__search">
+                    <input type="text" id="colorFilterSearch" placeholder="Search colors..." class="filter-search-input">
+                  </div>
+                  <div class="filter-multiselect__options" id="colorFilterOptions"></div>
+                </div>
+              </div>
+            </div>
+            
             <button type="button" class="filter-clear-btn" id="clearFiltersBtn" style="display: none;">
               Clear Filters
             </button>
@@ -133,26 +153,115 @@
         const landingScreen = document.getElementById("landingScreen");
         const categorySelect = document.getElementById("categorySelect");
         const mirosEntry = document.getElementById("mirosEntry");
+        const mirosEntryLanding = document.getElementById("mirosEntryLanding");
         const statusMessage = document.getElementById("statusMessage");
         
-        // Show Miros entry button after search
-        const showMirosEntryButton = () => {
-          if (mirosEntry) {
-            mirosEntry.classList.add('visible');
-            // Use MutationObserver to watch for button injection by Miros widget
-            const observer = new MutationObserver((mutations) => {
-              mutations.forEach((mutation) => {
-                if (mutation.addedNodes.length > 0) {
-                  // Button was injected, ensure it's visible
-                  const button = mirosEntry.querySelector('button, [class*="miros"]');
-                  if (button) {
-                    button.style.display = 'flex';
-                    observer.disconnect();
+        // Track which buttons have handlers attached to prevent duplicates
+        const buttonsWithHandlers = new WeakSet();
+        
+        // Show Miros entry button (for both landing and results screens)
+        const showMirosEntryButton = (entryElement = null) => {
+          if (!ENABLE_MIROS_OVERLAY_BUTTON) return;
+          
+          const targetElement = entryElement || mirosEntry;
+          if (!targetElement) return;
+          
+          // Check if we already have an observer for this element
+          if (targetElement._mirosObserver) {
+            return; // Already set up
+          }
+          
+          targetElement.classList.add('visible');
+          
+          // Use MutationObserver to watch for button injection by Miros widget
+          const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+              if (mutation.addedNodes.length > 0) {
+                // Button was injected, ensure it's visible and add click handler
+                const button = targetElement.querySelector('button, [class*="miros"]');
+                if (button && !buttonsWithHandlers.has(button)) {
+                  button.style.display = 'flex';
+                  
+                  // Mark button as having handler
+                  buttonsWithHandlers.add(button);
+                  
+                  // Function to update entry attributes
+                  const updateEntryAttributes = () => {
+                    // Get search query from appropriate input
+                    const searchValue = currentSearchQuery || 
+                                      (searchInput ? searchInput.value.trim() : '') ||
+                                      (document.getElementById('landingSearchInput') ? document.getElementById('landingSearchInput').value.trim() : '');
+                    
+                    // Prepare entry with current search query
+                    const isSku = /^[A-Za-z0-9_-]+$/.test(searchValue);
+                    const attributes = {};
+                    if (isSku) {
+                      attributes.item = searchValue;
+                      attributes.nlp = "";
+                    } else {
+                      attributes.item = "";
+                      attributes.nlp = searchValue;
+                    }
+                    
+                    // Prepare entry for the correct element
+                    if (targetElement === mirosEntryLanding) {
+                      prepareEntryForElement(mirosEntryLanding, attributes);
+                    } else {
+                      prepareEntry(attributes);
+                    }
+                  };
+                  
+                  // Update attributes immediately
+                  updateEntryAttributes();
+                  
+                  // Update attributes before each click (so Miros widget gets current search)
+                  // Use capture phase to update BEFORE Miros's handler runs
+                  button.addEventListener('click', function handleMirosButtonClick(e) {
+                    // Update attributes right before the click propagates
+                    updateEntryAttributes();
+                    // Don't prevent default - let Miros button's native handler work
+                  }, true); // Use capture phase
+                  
+                  // Also update when search inputs change
+                  if (searchInput) {
+                    searchInput.addEventListener('input', updateEntryAttributes);
+                    searchInput.addEventListener('change', updateEntryAttributes);
                   }
+                  const landingInput = document.getElementById('landingSearchInput');
+                  if (landingInput) {
+                    landingInput.addEventListener('input', updateEntryAttributes);
+                    landingInput.addEventListener('change', updateEntryAttributes);
+                  }
+                  
+                  // Disconnect observer once button is set up
+                  observer.disconnect();
+                  targetElement._mirosObserver = null;
                 }
-              });
+              }
             });
-            observer.observe(mirosEntry, { childList: true, subtree: true });
+          });
+          
+          // Store observer reference
+          targetElement._mirosObserver = observer;
+          observer.observe(targetElement, { childList: true, subtree: true });
+        };
+        
+        // Initialize Miros buttons on page load
+        const initializeMirosButtons = () => {
+          if (!ENABLE_MIROS_OVERLAY_BUTTON) return;
+          
+          // Show button in landing screen immediately
+          if (mirosEntryLanding) {
+            mirosEntryLanding.classList.add('visible');
+            // Wait for Miros widget to inject the button, then set it up
+            setTimeout(() => {
+              showMirosEntryButton(mirosEntryLanding);
+            }, 1500);
+          }
+          
+          // Show button in results screen (will be shown after search)
+          if (mirosEntry) {
+            // Already handled by showMirosEntryButton() after search
           }
         };
         const resultsSummary = document.getElementById("resultsSummary");
@@ -527,7 +636,9 @@
           originalProducts = [];
           displayedProductsCount = 0;
           selectedBrands.clear();
+          selectedColors.clear();
           allBrands.clear();
+          allColors.clear();
           if (resultsBody) {
             resultsBody.innerHTML =
               '<div class="results-empty">Results cleared. Run a new search to see recommendations.</div>';
@@ -557,6 +668,7 @@
           originalProducts = [];
           displayedProductsCount = 0;
           selectedBrands.clear();
+          selectedColors.clear();
           if (resultsBody) {
             resultsBody.innerHTML =
               '<div class="results-empty">Searching Miros for matching products...</div>';
@@ -2465,16 +2577,39 @@
           }, 1000);
         }
 
-        // REMOVED: prepareEntry, openMirosOverlay, closeMirosOverlay - no longer needed with API-only approach
-        // These functions have been removed as DOM scraping/widget overlay is no longer used
+        // Miros Overlay Button Functions (NO scraping - overlay is independent)
+        // Flag to enable/disable overlay button (set to false to revert to previous state)
+        const ENABLE_MIROS_OVERLAY_BUTTON = true;
         
-        // REMOVED: Widget overlay functions
-        /*
         const prepareEntry = (attributes) => {
-          // Removed - not needed for API-only approach
+          prepareEntryForElement(mirosEntry, attributes);
+        };
+        
+        const prepareEntryForElement = (element, attributes) => {
+          if (!element || !ENABLE_MIROS_OVERLAY_BUTTON) return;
+
+          const ENTRY_ATTRS = [
+            "item",
+            "nlp",
+            "category",
+            "image-url",
+            "sizes",
+            "lang",
+          ];
+
+          ENTRY_ATTRS.forEach((attr) => {
+            const attrName = `data-miros-${attr}`;
+            if (attributes[attr]) {
+              element.setAttribute(attrName, attributes[attr]);
+            } else {
+              element.removeAttribute(attrName);
+            }
+          });
         };
 
         const openMirosOverlay = () => {
+          if (!ENABLE_MIROS_OVERLAY_BUTTON) return;
+          
           // The Miros widget injects an AI search button - we need to click that
           // Try multiple selectors to find the AI button
           const aiButton = 
@@ -2487,107 +2622,52 @@
             document.querySelector('button[class*="miros-box-border"]');
           
           if (aiButton) {
-            console.log('Found AI button, clicking it to open overlay');
+            // Click the button to open overlay (no console.log to prevent spam)
             aiButton.click();
             return;
           }
           
-          // Fallback: try clicking mirosEntry or triggering event
-          if (mirosEntry) {
-            console.log('AI button not found, trying to click mirosEntry');
-            // Try multiple ways to trigger the overlay
-            mirosEntry.click();
-            mirosEntry.dispatchEvent(
-              new MouseEvent("click", {
-                bubbles: true,
-                cancelable: true,
-                view: window,
-              }),
-            );
-          } else {
-            console.warn('No mirosEntry found and no AI button found');
+          // Fallback: try clicking mirosEntry elements
+          const entryElements = [mirosEntry, mirosEntryLanding].filter(Boolean);
+          for (const entryEl of entryElements) {
+            if (entryEl) {
+              entryEl.click();
+              entryEl.dispatchEvent(
+                new MouseEvent("click", {
+                  bubbles: true,
+                  cancelable: true,
+                  view: window,
+                }),
+              );
+            }
           }
         };
 
-        // Helper to close Miros widget overlay
-        const closeMirosOverlay = () => {
-          console.log('Attempting to close Miros overlay...');
-          
-          // Method 1: Find and click close button
-          const closeButtonSelectors = [
-            'button[aria-label*="close" i]',
-            'button[aria-label*="×"]',
-            'button[aria-label*="Close"]',
-            '[class*="close"] button',
-            '[class*="close-button"]',
-            '[class*="modal-close"]',
-            '[class*="overlay-close"]',
-            'button.close',
-            '.close-button',
-            '[data-dismiss="modal"]',
-            '[data-close]'
-          ];
-          
-          for (const selector of closeButtonSelectors) {
-            const closeBtn = document.querySelector(selector);
-            if (closeBtn && closeBtn.offsetParent !== null) { // Check if visible
-              console.log('Found close button, clicking:', selector);
-              closeBtn.click();
-              // Wait a bit and check if overlay closed
-              setTimeout(() => {
-                const overlay = document.querySelector('[role="dialog"], .modal, [class*="modal"], [class*="overlay"]');
-                if (overlay && overlay.id !== 'focusOverlay') {
-                  console.log('Overlay still open, trying ESC key...');
-                  // Try ESC key
-                  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true }));
-                }
-              }, 300);
-              return true;
-            }
-          }
-          
-          // Method 2: Try ESC key
-          console.log('Close button not found, trying ESC key...');
-          document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true }));
-          document.dispatchEvent(new KeyboardEvent('keyup', { key: 'Escape', keyCode: 27, bubbles: true }));
-          
-          // Method 3: Hide overlay with CSS as fallback
-          setTimeout(() => {
-            const overlay = document.querySelector('[role="dialog"], .modal, [class*="modal"], [class*="overlay"]');
-            if (overlay && overlay.id !== 'focusOverlay' && !overlay.classList.contains('focus-overlay')) {
-              console.log('Hiding overlay with CSS as fallback');
-              overlay.style.display = 'none';
-              overlay.style.visibility = 'hidden';
-              overlay.style.opacity = '0';
-              // Also hide any backdrop
-              const backdrop = document.querySelector('[class*="backdrop"], [class*="overlay-backdrop"]');
-              if (backdrop) {
-                backdrop.style.display = 'none';
-              }
-            }
-          }, 500);
-          
-          return false;
-        };
-        */
 
-        // Extract unique brands from products
+        // Extract unique brands and colors from products
         function extractFilterOptions() {
           allBrands.clear();
+          allColors.clear();
           
           originalProducts.forEach(product => {
             if (product.brand && product.brand.trim()) {
               allBrands.add(product.brand.trim());
             }
+            if (product.color && product.color.trim()) {
+              allColors.add(product.color.trim());
+            }
           });
           
           // Debug logging
           console.log('Extracted brands:', Array.from(allBrands));
+          console.log('Extracted colors:', Array.from(allColors));
           
           // Sort alphabetically
           const sortedBrands = Array.from(allBrands).sort();
+          const sortedColors = Array.from(allColors).sort();
           
           populateFilterOptions('brand', sortedBrands);
+          populateFilterOptions('color', sortedColors);
           
           // Filters container is always visible in filters header
           // No need to conditionally show/hide it based on products
@@ -2626,7 +2706,8 @@
             checkbox.type = 'checkbox';
             checkbox.id = `${type}-${option}`;
             checkbox.value = option;
-            checkbox.checked = (type === 'brand' ? selectedBrands : new Set()).has(option);
+            const selectedSet = type === 'brand' ? selectedBrands : (type === 'color' ? selectedColors : new Set());
+            checkbox.checked = selectedSet.has(option);
             if (checkbox.checked) {
               optionEl.classList.add('selected');
             }
@@ -2638,6 +2719,12 @@
                   selectedBrands.add(value);
                 } else {
                   selectedBrands.delete(value);
+                }
+              } else if (type === 'color') {
+                if (e.target.checked) {
+                  selectedColors.add(value);
+                } else {
+                  selectedColors.delete(value);
                 }
               }
               updateFilterUI();
@@ -2670,11 +2757,13 @@
         function updateFilterUI() {
           // Update brand filter selected display
           updateFilterSelectedDisplay('brand', selectedBrands);
+          // Update color filter selected display
+          updateFilterSelectedDisplay('color', selectedColors);
           
           // Show/hide clear button
           const clearBtn = document.getElementById('clearFiltersBtn');
           if (clearBtn) {
-            clearBtn.style.display = (selectedBrands.size > 0) ? 'block' : 'none';
+            clearBtn.style.display = (selectedBrands.size > 0 || selectedColors.size > 0) ? 'block' : 'none';
           }
         }
 
@@ -2698,7 +2787,8 @@
               if (selectedSet.size > 0) {
                 placeholder.textContent = `${selectedSet.size} selected`;
               } else {
-                placeholder.textContent = 'Select brands...';
+                const placeholderText = type === 'brand' ? 'Select brands...' : (type === 'color' ? 'Select colors...' : 'Select...');
+                placeholder.textContent = placeholderText;
               }
             }
           }
@@ -2744,6 +2834,8 @@
                 const filterValue = newBtn.dataset.value;
                 if (filterType === 'brand') {
                   selectedBrands.delete(filterValue);
+                } else if (filterType === 'color') {
+                  selectedColors.delete(filterValue);
                 }
                 updateFilterUI();
                 applyFilters();
@@ -2760,9 +2852,17 @@
           // Apply brand filter
           let filtered = sourceProducts;
           if (selectedBrands.size > 0) {
-            filtered = sourceProducts.filter(product => {
+            filtered = filtered.filter(product => {
               const brand = (product.brand || '').trim();
               return brand && selectedBrands.has(brand);
+            });
+          }
+          
+          // Apply color filter
+          if (selectedColors.size > 0) {
+            filtered = filtered.filter(product => {
+              const color = (product.color || '').trim();
+              return color && selectedColors.has(color);
             });
           }
           
@@ -2785,7 +2885,7 @@
 
         // Setup filter dropdown toggles
         function setupFilterDropdowns() {
-          ['brand'].forEach(type => {
+          ['brand', 'color'].forEach(type => {
             const selectedEl = document.getElementById(`${type}FilterSelected`);
             const dropdownEl = document.getElementById(`${type}FilterDropdown`);
             
@@ -2843,11 +2943,25 @@
           if (clearBtn) {
             clearBtn.addEventListener('click', () => {
               selectedBrands.clear();
+              selectedColors.clear();
               
               // Uncheck all brand filter checkboxes
               const brandFilterOptions = document.getElementById('brandFilterOptions');
               if (brandFilterOptions) {
                 const checkboxes = brandFilterOptions.querySelectorAll('input[type="checkbox"]');
+                checkboxes.forEach(checkbox => {
+                  checkbox.checked = false;
+                  const optionEl = checkbox.closest('.filter-option');
+                  if (optionEl) {
+                    optionEl.classList.remove('selected');
+                  }
+                });
+              }
+              
+              // Uncheck all color filter checkboxes
+              const colorFilterOptions = document.getElementById('colorFilterOptions');
+              if (colorFilterOptions) {
+                const checkboxes = colorFilterOptions.querySelectorAll('input[type="checkbox"]');
                 checkboxes.forEach(checkbox => {
                   checkbox.checked = false;
                   const optionEl = checkbox.closest('.filter-option');
@@ -2924,10 +3038,24 @@
               console.log(`📊 FINAL COUNT: ${allProducts.length} total products fetched and stored`);
               console.log(`💡 To check products anytime, type in console: allProducts.length`);
               showStatus(`Successfully loaded ${allProducts.length} products via Miros API.`, "success");
-              // Show Miros entry button after successful search
-              setTimeout(() => {
-                showMirosEntryButton();
-              }, 500);
+              // Show Miros entry button after successful search (if enabled)
+              if (ENABLE_MIROS_OVERLAY_BUTTON) {
+                // Prepare entry with current search query
+                const isSku = /^[A-Za-z0-9_-]+$/.test(rawValue);
+                const attributes = {};
+                if (isSku) {
+                  attributes.item = rawValue;
+                  attributes.nlp = "";
+                } else {
+                  attributes.item = "";
+                  attributes.nlp = rawValue;
+                }
+                prepareEntry(attributes);
+                
+                setTimeout(() => {
+                  showMirosEntryButton();
+                }, 500);
+              }
               setTimeout(() => clearStatus(), 3000);
                 } else {
               console.log(`⚠️ No products found for search: "${rawValue}"`);
@@ -3058,12 +3186,19 @@
 
         // Initialize filter dropdowns
         setupFilterDropdowns();
+        
+        // Initialize Miros buttons on page load
+        initializeMirosButtons();
 
         // Initialize infinite scroll when page loads
         if (document.readyState === 'loading') {
-          document.addEventListener('DOMContentLoaded', setupInfiniteScroll);
+          document.addEventListener('DOMContentLoaded', () => {
+            setupInfiniteScroll();
+            initializeMirosButtons();
+          });
         } else {
           setupInfiniteScroll();
+          initializeMirosButtons();
         }
       })();
     </script>

@@ -345,6 +345,8 @@ body.has-results .dashboard__header-title {
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
+  margin-left: 8px;
+  min-width: 0;
 }
 
 .miros-entry-wrapper.visible {
@@ -1308,12 +1310,12 @@ body:not(.has-results) .dashboard__filters-header {
 /* Filters Container */
 .filters-container {
   display: flex;
-  gap: var(--spacing-md);
+  gap: 16px;
   align-items: flex-end;
   flex-wrap: wrap;
   flex: 1;
   min-width: 0;
-  justify-content: space-between;
+  justify-content: flex-start;
   width: 100%;
 }
 
