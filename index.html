@@ -699,8 +699,20 @@
 
             const productId = deriveProductIdFromSource(url, optionId);
             
-            const imageHtml = imageUrl
-              ? `<img src="${imageUrl}" alt="${productTitle}" class="product-card__image" />`
+            // Append query string to image URL for optimized display
+            let processedImageUrl = imageUrl;
+            if (imageUrl) {
+              const queryString = "fmt=auto&$quality-standard$&sm=c&$prodimg-d-prt-pdp-2x$";
+              // Check if URL already has query parameters
+              if (imageUrl.includes('?')) {
+                processedImageUrl = imageUrl + '&' + queryString;
+              } else {
+                processedImageUrl = imageUrl + '?' + queryString;
+              }
+            }
+            
+            const imageHtml = processedImageUrl
+              ? `<img src="${processedImageUrl}" alt="${productTitle}" class="product-card__image" />`
               : '<div class="product-card__image product-card__image--placeholder">No Image</div>';
 
             const brandHtml = brand 
@@ -2662,15 +2674,55 @@
           console.log('Extracted brands:', Array.from(allBrands));
           console.log('Extracted colors:', Array.from(allColors));
           
-          // Sort alphabetically
-          const sortedBrands = Array.from(allBrands).sort();
-          const sortedColors = Array.from(allColors).sort();
-          
-          populateFilterOptions('brand', sortedBrands);
-          populateFilterOptions('color', sortedColors);
+          // Update filter options based on current selections (synchronized filtering)
+          updateSynchronizedFilterOptions();
           
           // Filters container is always visible in filters header
           // No need to conditionally show/hide it based on products
+        }
+
+        // Get available filter options based on other selected filters (synchronized filtering)
+        function getAvailableFilterOptions(type) {
+          // Start with all original products
+          let filteredProducts = [...originalProducts];
+          
+          // Apply filters from OTHER filter types (not the one we're calculating for)
+          if (type !== 'brand' && selectedBrands.size > 0) {
+            filteredProducts = filteredProducts.filter(product => {
+              const brand = (product.brand || '').trim();
+              return brand && selectedBrands.has(brand);
+            });
+          }
+          
+          if (type !== 'color' && selectedColors.size > 0) {
+            filteredProducts = filteredProducts.filter(product => {
+              const color = (product.color || '').trim();
+              return color && selectedColors.has(color);
+            });
+          }
+          
+          // Extract unique values for the requested filter type from filtered products
+          const availableOptions = new Set();
+          filteredProducts.forEach(product => {
+            if (type === 'brand' && product.brand && product.brand.trim()) {
+              availableOptions.add(product.brand.trim());
+            } else if (type === 'color' && product.color && product.color.trim()) {
+              availableOptions.add(product.color.trim());
+            }
+          });
+          
+          return Array.from(availableOptions).sort();
+        }
+
+        // Update filter options based on synchronized filtering logic
+        function updateSynchronizedFilterOptions() {
+          // Get available options for each filter based on other selected filters
+          const availableBrands = getAvailableFilterOptions('brand');
+          const availableColors = getAvailableFilterOptions('color');
+          
+          // Populate filter options with synchronized data
+          populateFilterOptions('brand', availableBrands);
+          populateFilterOptions('color', availableColors);
         }
 
         // Populate filter dropdown options
@@ -2727,6 +2779,9 @@
                   selectedColors.delete(value);
                 }
               }
+              
+              // Update synchronized filter options when a filter changes
+              updateSynchronizedFilterOptions();
               updateFilterUI();
               applyFilters();
             });
@@ -2837,6 +2892,8 @@
                 } else if (filterType === 'color') {
                   selectedColors.delete(filterValue);
                 }
+                // Update synchronized filter options when a filter tag is removed
+                updateSynchronizedFilterOptions();
                 updateFilterUI();
                 applyFilters();
               });
@@ -2971,6 +3028,8 @@
                 });
               }
               
+              // Update synchronized filter options after clearing
+              updateSynchronizedFilterOptions();
               updateFilterUI();
               applyFilters();
             });
