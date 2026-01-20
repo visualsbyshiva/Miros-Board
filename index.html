@@ -89,40 +89,61 @@
       <!-- Scroll-Reactive Filters Header -->
       <div class="dashboard__filters-header" id="filtersHeader" style="display: none;">
         <div class="dashboard__filters-header-content">
-          <div class="filters-container" id="filtersContainer" style="display: flex;">
-            <div class="filter-group">
-              <label class="filter-label">Brand</label>
-              <div class="filter-multiselect" id="brandFilter">
-                <div class="filter-multiselect__selected" id="brandFilterSelected">
-                  <span class="filter-placeholder">Select brands...</span>
-                </div>
-                <div class="filter-multiselect__dropdown" id="brandFilterDropdown" style="display: none;">
-                  <div class="filter-multiselect__search">
-                    <input type="text" id="brandFilterSearch" placeholder="Search brands..." class="filter-search-input">
+          <div class="dashboard__filters-header-top-row">
+            <div class="filters-container" id="filtersContainer" style="display: flex;">
+              <div class="filter-group">
+                <label class="filter-label">Brand</label>
+                <div class="filter-multiselect" id="brandFilter">
+                  <div class="filter-multiselect__selected" id="brandFilterSelected">
+                    <span class="filter-placeholder">Select brands...</span>
                   </div>
-                  <div class="filter-multiselect__options" id="brandFilterOptions"></div>
+                  <div class="filter-multiselect__dropdown" id="brandFilterDropdown" style="display: none;">
+                    <div class="filter-multiselect__search">
+                      <input type="text" id="brandFilterSearch" placeholder="Search brands..." class="filter-search-input">
+                    </div>
+                    <div class="filter-multiselect__options" id="brandFilterOptions"></div>
+                  </div>
                 </div>
               </div>
-            </div>
-            
-            <div class="filter-group">
-              <label class="filter-label">Color</label>
-              <div class="filter-multiselect" id="colorFilter">
-                <div class="filter-multiselect__selected" id="colorFilterSelected">
-                  <span class="filter-placeholder">Select colors...</span>
-                </div>
-                <div class="filter-multiselect__dropdown" id="colorFilterDropdown" style="display: none;">
-                  <div class="filter-multiselect__search">
-                    <input type="text" id="colorFilterSearch" placeholder="Search colors..." class="filter-search-input">
+              
+              <div class="filter-group">
+                <label class="filter-label">Color</label>
+                <div class="filter-multiselect" id="colorFilter">
+                  <div class="filter-multiselect__selected" id="colorFilterSelected">
+                    <span class="filter-placeholder">Select colors...</span>
                   </div>
-                  <div class="filter-multiselect__options" id="colorFilterOptions"></div>
+                  <div class="filter-multiselect__dropdown" id="colorFilterDropdown" style="display: none;">
+                    <div class="filter-multiselect__search">
+                      <input type="text" id="colorFilterSearch" placeholder="Search colors..." class="filter-search-input">
+                    </div>
+                    <div class="filter-multiselect__options" id="colorFilterOptions"></div>
+                  </div>
                 </div>
               </div>
+              
+              <div class="filter-group">
+                <label class="filter-label">Material</label>
+                <div class="filter-multiselect" id="materialFilter">
+                  <div class="filter-multiselect__selected" id="materialFilterSelected">
+                    <span class="filter-placeholder">Select materials...</span>
+                  </div>
+                  <div class="filter-multiselect__dropdown" id="materialFilterDropdown" style="display: none;">
+                    <div class="filter-multiselect__search">
+                      <input type="text" id="materialFilterSearch" placeholder="Search materials..." class="filter-search-input">
+                    </div>
+                    <div class="filter-multiselect__options" id="materialFilterOptions"></div>
+                  </div>
+                </div>
+              </div>
+              
+              <button type="button" class="filter-clear-btn" id="clearFiltersBtn" style="display: none;">
+                Clear Filters
+              </button>
             </div>
-            
-            <button type="button" class="filter-clear-btn" id="clearFiltersBtn" style="display: none;">
-              Clear Filters
-            </button>
+            <div class="filters-header-results-count" id="filtersHeaderResultsCount">
+              <span class="filters-header-results-count__number"></span>
+              <span class="filters-header-results-count__label">products</span>
+            </div>
           </div>
           <div class="selected-filters-container" id="selectedFiltersContainer" style="display: none;"></div>
         </div>
@@ -277,6 +298,13 @@
         let hasSearched = false;
         let isFocusMode = false;
         let allProducts = []; // Store all scraped products
+        
+        // Expose allProducts to global scope for console access
+        Object.defineProperty(window, 'allProducts', {
+          get: function() { return allProducts; },
+          configurable: true
+        });
+        
         let originalProducts = []; // Store original unfiltered products
         let displayedProductsCount = 0; // Track how many products are currently displayed
         const itemsPerLoad = 50; // Load 50 products at a time when scrolling
@@ -289,8 +317,10 @@
         // Filter state
         let selectedBrands = new Set();
         let selectedColors = new Set();
+        let selectedMaterials = new Set();
         let allBrands = new Set();
         let allColors = new Set();
+        let allMaterials = new Set();
 
         // STATE 1: Initial State - hide results on first load
         if (dashboardResults) {
@@ -637,8 +667,10 @@
           displayedProductsCount = 0;
           selectedBrands.clear();
           selectedColors.clear();
+          selectedMaterials.clear();
           allBrands.clear();
           allColors.clear();
+          allMaterials.clear();
           if (resultsBody) {
             resultsBody.innerHTML =
               '<div class="results-empty">Results cleared. Run a new search to see recommendations.</div>';
@@ -659,6 +691,7 @@
           }
           updateFilterUI();
           updatePaginationInfo();
+          updateProductCountDisplay(); // Reset count to 0
           // Keep results section visible in STATE 2, just clear the data
         };
 
@@ -669,6 +702,7 @@
           displayedProductsCount = 0;
           selectedBrands.clear();
           selectedColors.clear();
+          selectedMaterials.clear();
           if (resultsBody) {
             resultsBody.innerHTML =
               '<div class="results-empty">Searching Miros for matching products...</div>';
@@ -817,16 +851,36 @@
           const { reset = false, silent = false } = options;
           if (!Array.isArray(items)) return 0;
           
+          const totalItems = items.length;
+          let filteredByScoreCount = 0;
+          
           const normalized = items
             .filter(Boolean)
+            .filter((item) => {
+              // Filter products with score > 0.415
+              const score = item.score !== undefined && item.score !== null ? parseFloat(item.score) : 0;
+              const passesFilter = score > 0.415;
+              if (!passesFilter) {
+                filteredByScoreCount++;
+              }
+              return passesFilter;
+            })
             .map((item) => ({
               productTitle: item.productTitle || item.title || item.name || '-',
               optionId: item.optionId || item.option_id || item.itemId || item.item_id || '-',
               url: item.url || item.productUrl || item.product_url || item.uri || '',
               imageUrl: item.imageUrl || item.image_url || item.image || item.img || '',
               brand: item.brand || item.brandName || '',
-              color: item.color_name || item.color || item.colour || item.colour_name || '',
+              color: (item.payload && item.payload.color) ? item.payload.color : (item.color_name || item.color || item.colour || item.colour_name || ''),
+              material: (item.payload && item.payload.material) ? item.payload.material : '',
+              payload: item.payload || null,
+              score: item.score !== undefined && item.score !== null ? parseFloat(item.score) : 0,
             }));
+          
+          if (filteredByScoreCount > 0) {
+            console.log(`✅ Score filtering applied: ${filteredByScoreCount} products filtered out (score <= 0.415) out of ${totalItems} total`);
+            console.log(`📊 Products passing score filter (score > 0.415): ${normalized.length}`);
+          }
           
           let baseList = reset ? [] : Array.isArray(allProducts) ? [...allProducts] : [];
           const seenKeys = new Set(
@@ -863,6 +917,9 @@
           
           // Extract filter options after products are added (before rendering)
           extractFilterOptions();
+          
+          // Update product count display
+          updateProductCountDisplay();
           
           // Initialize infinite scroll with new products - render immediately
           if (reset || displayedProductsCount === 0) {
@@ -1020,6 +1077,7 @@
                   price
                   price_discounted
                   score
+                  payload
                 }
               }
             `;
@@ -1051,8 +1109,16 @@
                 // Process and deduplicate recommendations
                 let newItemsCount = 0;
                 let duplicateCount = 0;
+                let filteredByScoreCount = 0;
                 
                 for (const item of recommendations) {
+                  // Filter by score FIRST - only include products with score > 0.415
+                  const score = item.score !== undefined && item.score !== null ? parseFloat(item.score) : 0;
+                  if (score <= 0.415) {
+                    filteredByScoreCount++;
+                    continue; // Skip items with score <= 0.415
+                  }
+                  
                   // Transform to our format (recommendations returns: id, alias, name, url, image, brand, etc.)
                   const normalized = {
                     productTitle: item.name || item.alias || '-',
@@ -1060,7 +1126,10 @@
                     url: item.url || '',
                     imageUrl: item.image || item.image_optimized || '',
                     brand: item.brand || '',
-                    color: item.color_name || item.color || '',
+                    color: (item.payload && item.payload.color) ? item.payload.color : (item.color_name || item.color || ''),
+                    material: (item.payload && item.payload.material) ? item.payload.material : '',
+                    payload: item.payload || null,
+                    score: score,
                   };
                   
                   const key = (normalized.url || normalized.optionId || '').toLowerCase().trim();
@@ -1080,8 +1149,9 @@
                   newItemsCount++;
                 }
                 
-                console.log(`Added ${newItemsCount} new items, skipped ${duplicateCount} duplicates`);
-                console.log(`Total unique products: ${aggregated.length}`);
+                console.log(`✅ Score filtering applied: ${filteredByScoreCount} products filtered out (score <= 0.415)`);
+                console.log(`Added ${newItemsCount} new items (score > 0.415), skipped ${duplicateCount} duplicates`);
+                console.log(`Total unique products after score filtering: ${aggregated.length}`);
               }
             } catch (error) {
               console.error(`Error fetching recommendations:`, error);
@@ -1132,6 +1202,7 @@
             imageUrl: item.imageUrl || item.image_url || item.image || item.img || item.imageUrl || item.thumbnail || '',
             brand: item.brand || item.brandName || '',
             color: item.color_name || item.color || item.colour || item.colour_name || '',
+            payload: item.payload || null,
           };
         }
 
@@ -1297,8 +1368,8 @@
                 };
               });
               
-              // Store all products and initialize infinite scroll
-              allProducts = items;
+              // Store all products through appendUniqueProducts to apply score filtering
+              appendUniqueProducts(items, { reset: true, silent: false });
               displayedProductsCount = 0;
               initializeInfiniteScroll();
               return items.length > 0;
@@ -2148,6 +2219,26 @@
           console.log(`📊 Products Status: ${displayedProductsCount} displayed out of ${allProducts.length} total products fetched`);
         }
 
+        // Update product count in filters header
+        function updateProductCountDisplay() {
+          const countElement = document.querySelector('#filtersHeaderResultsCount .filters-header-results-count__number');
+          if (countElement) {
+            // Check if any filters are active
+            const hasActiveFilters = selectedBrands.size > 0 || selectedColors.size > 0 || selectedMaterials.size > 0;
+            
+            // If filters are active, show filtered count, otherwise show total count
+            const count = hasActiveFilters 
+              ? allProducts.length  // Filtered products count
+              : (originalProducts.length > 0 ? originalProducts.length : allProducts.length); // Total products count
+            countElement.textContent = count.toLocaleString(); // Formats with commas (e.g., 1,234)
+            
+            // Debug logging
+            if (hasActiveFilters) {
+              console.log(`🔢 Product count updated: ${count} (filtered from ${originalProducts.length} total)`);
+            }
+          }
+        }
+
         // Fetch results directly from Miros API (no popup)
         async function fetchMirosResultsDirectly(type, options) {
           const { url, itemId, query, category, limit = 15 } = options;
@@ -2194,6 +2285,7 @@
                     title
                     url
                     imageUrl
+                    payload
                   }
                 }
               `;
@@ -2204,6 +2296,7 @@
                   title
                   url
                   imageUrl
+                  payload
                 }
               `;
             } else if (availableFields.includes('nodes')) {
@@ -2213,6 +2306,7 @@
                   title
                   url
                   imageUrl
+                  payload
                 }
               `;
             } else if (availableFields.includes('suggestions')) {
@@ -2222,6 +2316,7 @@
                   title
                   url
                   imageUrl
+                  payload
                 }
               `;
             } else if (availableFields.includes('data')) {
@@ -2231,6 +2326,7 @@
                   title
                   url
                   imageUrl
+                  payload
                 }
               `;
             } else {
@@ -2310,13 +2406,13 @@
             // Build query dynamically based on what fields actually exist
             let fieldsToQuery = '';
             if (availableFields.includes('edges')) {
-              fieldsToQuery = `edges { node { itemId title url imageUrl } }`;
+              fieldsToQuery = `edges { node { itemId title url imageUrl payload } }`;
             } else if (availableFields.includes('items')) {
-              fieldsToQuery = `items { itemId title url imageUrl }`;
+              fieldsToQuery = `items { itemId title url imageUrl payload }`;
             } else if (availableFields.includes('nodes')) {
-              fieldsToQuery = `nodes { itemId title url imageUrl }`;
+              fieldsToQuery = `nodes { itemId title url imageUrl payload }`;
             } else if (availableFields.includes('suggestions')) {
-              fieldsToQuery = `suggestions { itemId title url imageUrl }`;
+              fieldsToQuery = `suggestions { itemId title url imageUrl payload }`;
             } else {
               // Query all available fields to see structure
               fieldsToQuery = availableFields.slice(0, 10).join(' ');
@@ -2387,13 +2483,13 @@
             // Build query dynamically based on what fields actually exist
             let fieldsToQuery = '';
             if (availableFields.includes('edges')) {
-              fieldsToQuery = `edges { node { itemId title url imageUrl } }`;
+              fieldsToQuery = `edges { node { itemId title url imageUrl payload } }`;
             } else if (availableFields.includes('items')) {
-              fieldsToQuery = `items { itemId title url imageUrl }`;
+              fieldsToQuery = `items { itemId title url imageUrl payload }`;
             } else if (availableFields.includes('nodes')) {
-              fieldsToQuery = `nodes { itemId title url imageUrl }`;
+              fieldsToQuery = `nodes { itemId title url imageUrl payload }`;
             } else if (availableFields.includes('suggestions')) {
-              fieldsToQuery = `suggestions { itemId title url imageUrl }`;
+              fieldsToQuery = `suggestions { itemId title url imageUrl payload }`;
             } else {
               // Query all available fields to see structure
               fieldsToQuery = availableFields.slice(0, 10).join(' ');
@@ -2656,10 +2752,11 @@
         };
 
 
-        // Extract unique brands and colors from products
+        // Extract unique brands, colors, and materials from products
         function extractFilterOptions() {
           allBrands.clear();
           allColors.clear();
+          allMaterials.clear();
           
           originalProducts.forEach(product => {
             if (product.brand && product.brand.trim()) {
@@ -2668,11 +2765,15 @@
             if (product.color && product.color.trim()) {
               allColors.add(product.color.trim());
             }
+            if (product.material && product.material.trim()) {
+              allMaterials.add(product.material.trim());
+            }
           });
           
           // Debug logging
           console.log('Extracted brands:', Array.from(allBrands));
           console.log('Extracted colors:', Array.from(allColors));
+          console.log('Extracted materials:', Array.from(allMaterials));
           
           // Update filter options based on current selections (synchronized filtering)
           updateSynchronizedFilterOptions();
@@ -2701,6 +2802,13 @@
             });
           }
           
+          if (type !== 'material' && selectedMaterials.size > 0) {
+            filteredProducts = filteredProducts.filter(product => {
+              const material = (product.material || '').trim();
+              return material && selectedMaterials.has(material);
+            });
+          }
+          
           // Extract unique values for the requested filter type from filtered products
           const availableOptions = new Set();
           filteredProducts.forEach(product => {
@@ -2708,6 +2816,8 @@
               availableOptions.add(product.brand.trim());
             } else if (type === 'color' && product.color && product.color.trim()) {
               availableOptions.add(product.color.trim());
+            } else if (type === 'material' && product.material && product.material.trim()) {
+              availableOptions.add(product.material.trim());
             }
           });
           
@@ -2719,10 +2829,12 @@
           // Get available options for each filter based on other selected filters
           const availableBrands = getAvailableFilterOptions('brand');
           const availableColors = getAvailableFilterOptions('color');
+          const availableMaterials = getAvailableFilterOptions('material');
           
           // Populate filter options with synchronized data
           populateFilterOptions('brand', availableBrands);
           populateFilterOptions('color', availableColors);
+          populateFilterOptions('material', availableMaterials);
         }
 
         // Populate filter dropdown options
@@ -2758,7 +2870,7 @@
             checkbox.type = 'checkbox';
             checkbox.id = `${type}-${option}`;
             checkbox.value = option;
-            const selectedSet = type === 'brand' ? selectedBrands : (type === 'color' ? selectedColors : new Set());
+            const selectedSet = type === 'brand' ? selectedBrands : (type === 'color' ? selectedColors : (type === 'material' ? selectedMaterials : new Set()));
             checkbox.checked = selectedSet.has(option);
             if (checkbox.checked) {
               optionEl.classList.add('selected');
@@ -2777,6 +2889,12 @@
                   selectedColors.add(value);
                 } else {
                   selectedColors.delete(value);
+                }
+              } else if (type === 'material') {
+                if (e.target.checked) {
+                  selectedMaterials.add(value);
+                } else {
+                  selectedMaterials.delete(value);
                 }
               }
               
@@ -2814,11 +2932,13 @@
           updateFilterSelectedDisplay('brand', selectedBrands);
           // Update color filter selected display
           updateFilterSelectedDisplay('color', selectedColors);
+          // Update material filter selected display
+          updateFilterSelectedDisplay('material', selectedMaterials);
           
           // Show/hide clear button
           const clearBtn = document.getElementById('clearFiltersBtn');
           if (clearBtn) {
-            clearBtn.style.display = (selectedBrands.size > 0 || selectedColors.size > 0) ? 'block' : 'none';
+            clearBtn.style.display = (selectedBrands.size > 0 || selectedColors.size > 0 || selectedMaterials.size > 0) ? 'block' : 'none';
           }
         }
 
@@ -2842,7 +2962,7 @@
               if (selectedSet.size > 0) {
                 placeholder.textContent = `${selectedSet.size} selected`;
               } else {
-                const placeholderText = type === 'brand' ? 'Select brands...' : (type === 'color' ? 'Select colors...' : 'Select...');
+                const placeholderText = type === 'brand' ? 'Select brands...' : (type === 'color' ? 'Select colors...' : (type === 'material' ? 'Select materials...' : 'Select...'));
                 placeholder.textContent = placeholderText;
               }
             }
@@ -2891,6 +3011,8 @@
                   selectedBrands.delete(filterValue);
                 } else if (filterType === 'color') {
                   selectedColors.delete(filterValue);
+                } else if (filterType === 'material') {
+                  selectedMaterials.delete(filterValue);
                 }
                 // Update synchronized filter options when a filter tag is removed
                 updateSynchronizedFilterOptions();
@@ -2923,6 +3045,14 @@
             });
           }
           
+          // Apply material filter
+          if (selectedMaterials.size > 0) {
+            filtered = filtered.filter(product => {
+              const material = (product.material || '').trim();
+              return material && selectedMaterials.has(material);
+            });
+          }
+          
           // Update displayed products with filtered results
           displayedProductsCount = 0;
           allProducts = filtered; // Use filtered for rendering
@@ -2938,11 +3068,17 @@
             summariseResults(0);
             updatePaginationInfo();
           }
+          
+          // Update product count display after all updates (shows filtered count)
+          // Use setTimeout to ensure DOM has updated
+          setTimeout(() => {
+            updateProductCountDisplay();
+          }, 0);
         }
 
         // Setup filter dropdown toggles
         function setupFilterDropdowns() {
-          ['brand', 'color'].forEach(type => {
+          ['brand', 'color', 'material'].forEach(type => {
             const selectedEl = document.getElementById(`${type}FilterSelected`);
             const dropdownEl = document.getElementById(`${type}FilterDropdown`);
             
@@ -3001,6 +3137,7 @@
             clearBtn.addEventListener('click', () => {
               selectedBrands.clear();
               selectedColors.clear();
+              selectedMaterials.clear();
               
               // Uncheck all brand filter checkboxes
               const brandFilterOptions = document.getElementById('brandFilterOptions');
@@ -3019,6 +3156,19 @@
               const colorFilterOptions = document.getElementById('colorFilterOptions');
               if (colorFilterOptions) {
                 const checkboxes = colorFilterOptions.querySelectorAll('input[type="checkbox"]');
+                checkboxes.forEach(checkbox => {
+                  checkbox.checked = false;
+                  const optionEl = checkbox.closest('.filter-option');
+                  if (optionEl) {
+                    optionEl.classList.remove('selected');
+                  }
+                });
+              }
+              
+              // Uncheck all material filter checkboxes
+              const materialFilterOptions = document.getElementById('materialFilterOptions');
+              if (materialFilterOptions) {
+                const checkboxes = materialFilterOptions.querySelectorAll('input[type="checkbox"]');
                 checkboxes.forEach(checkbox => {
                   checkbox.checked = false;
                   const optionEl = checkbox.closest('.filter-option');
