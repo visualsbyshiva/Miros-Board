@@ -82,7 +82,13 @@
               ></div>
             </div>
           </div>
-          <button type="button" class="dashboard__button dashboard__button--download" id="downloadButton">Download as .csv</button>
+          <div class="dashboard__header-actions">
+            <div class="filters-header-results-count" id="filtersHeaderResultsCount">
+              <span class="filters-header-results-count__number"></span>
+              <span class="filters-header-results-count__label">products</span>
+            </div>
+            <button type="button" class="dashboard__button dashboard__button--download" id="downloadButton">Download as .csv</button>
+          </div>
         </div>
       </header>
 
@@ -91,58 +97,81 @@
         <div class="dashboard__filters-header-content">
           <div class="dashboard__filters-header-top-row">
             <div class="filters-container" id="filtersContainer" style="display: flex;">
-              <div class="filter-group">
-                <label class="filter-label">Brand</label>
-                <div class="filter-multiselect" id="brandFilter">
-                  <div class="filter-multiselect__selected" id="brandFilterSelected">
-                    <span class="filter-placeholder">Select brands...</span>
-                  </div>
-                  <div class="filter-multiselect__dropdown" id="brandFilterDropdown" style="display: none;">
-                    <div class="filter-multiselect__search">
-                      <input type="text" id="brandFilterSearch" placeholder="Search brands..." class="filter-search-input">
+              <div class="filters-left">
+                <div class="filter-group">
+                  <label class="filter-label">Brand</label>
+                  <div class="filter-multiselect" id="brandFilter">
+                    <div class="filter-multiselect__selected" id="brandFilterSelected">
+                      <span class="filter-placeholder">Select brands...</span>
                     </div>
-                    <div class="filter-multiselect__options" id="brandFilterOptions"></div>
+                    <div class="filter-multiselect__dropdown" id="brandFilterDropdown" style="display: none;">
+                      <div class="filter-multiselect__search">
+                        <input type="text" id="brandFilterSearch" placeholder="Search brands..." class="filter-search-input">
+                      </div>
+                      <div class="filter-multiselect__options" id="brandFilterOptions"></div>
+                    </div>
                   </div>
                 </div>
-              </div>
-              
-              <div class="filter-group">
-                <label class="filter-label">Color</label>
-                <div class="filter-multiselect" id="colorFilter">
-                  <div class="filter-multiselect__selected" id="colorFilterSelected">
-                    <span class="filter-placeholder">Select colors...</span>
-                  </div>
-                  <div class="filter-multiselect__dropdown" id="colorFilterDropdown" style="display: none;">
-                    <div class="filter-multiselect__search">
-                      <input type="text" id="colorFilterSearch" placeholder="Search colors..." class="filter-search-input">
+
+                <div class="filter-group">
+                  <label class="filter-label">Color</label>
+                  <div class="filter-multiselect" id="colorFilter">
+                    <div class="filter-multiselect__selected" id="colorFilterSelected">
+                      <span class="filter-placeholder">Select colors...</span>
                     </div>
-                    <div class="filter-multiselect__options" id="colorFilterOptions"></div>
+                    <div class="filter-multiselect__dropdown" id="colorFilterDropdown" style="display: none;">
+                      <div class="filter-multiselect__search">
+                        <input type="text" id="colorFilterSearch" placeholder="Search colors..." class="filter-search-input">
+                      </div>
+                      <div class="filter-multiselect__options" id="colorFilterOptions"></div>
+                    </div>
                   </div>
                 </div>
-              </div>
-              
-              <div class="filter-group">
-                <label class="filter-label">Material</label>
-                <div class="filter-multiselect" id="materialFilter">
-                  <div class="filter-multiselect__selected" id="materialFilterSelected">
-                    <span class="filter-placeholder">Select materials...</span>
-                  </div>
-                  <div class="filter-multiselect__dropdown" id="materialFilterDropdown" style="display: none;">
-                    <div class="filter-multiselect__search">
-                      <input type="text" id="materialFilterSearch" placeholder="Search materials..." class="filter-search-input">
+
+                <div class="filter-group">
+                  <label class="filter-label">Material</label>
+                  <div class="filter-multiselect" id="materialFilter">
+                    <div class="filter-multiselect__selected" id="materialFilterSelected">
+                      <span class="filter-placeholder">Select materials...</span>
                     </div>
-                    <div class="filter-multiselect__options" id="materialFilterOptions"></div>
+                    <div class="filter-multiselect__dropdown" id="materialFilterDropdown" style="display: none;">
+                      <div class="filter-multiselect__search">
+                        <input type="text" id="materialFilterSearch" placeholder="Search materials..." class="filter-search-input">
+                      </div>
+                      <div class="filter-multiselect__options" id="materialFilterOptions"></div>
+                    </div>
                   </div>
                 </div>
+
+                <div class="filter-group">
+                  <label class="filter-label">Gender</label>
+                  <div class="filter-multiselect" id="genderFilter">
+                    <div class="filter-multiselect__selected" id="genderFilterSelected">
+                      <span class="filter-placeholder">Select genders...</span>
+                    </div>
+                    <div class="filter-multiselect__dropdown" id="genderFilterDropdown" style="display: none;">
+                      <div class="filter-multiselect__search">
+                        <input type="text" id="genderFilterSearch" placeholder="Search genders..." class="filter-search-input">
+                      </div>
+                      <div class="filter-multiselect__options" id="genderFilterOptions"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <button type="button" class="filter-clear-btn" id="clearFiltersBtn" style="display: none;">
+                  Clear Filters
+                </button>
               </div>
-              
-              <button type="button" class="filter-clear-btn" id="clearFiltersBtn" style="display: none;">
-                Clear Filters
-              </button>
-            </div>
-            <div class="filters-header-results-count" id="filtersHeaderResultsCount">
-              <span class="filters-header-results-count__number"></span>
-              <span class="filters-header-results-count__label">products</span>
+
+              <div class="filters-right">
+                <div class="filter-group">
+                  <label class="filter-label">Sort By</label>
+                  <select id="sortSelect" class="filter-sort-select">
+                    <option value="relevance">Relevance</option>
+                    <option value="latest">New Arrivals</option>
+                  </select>
+                </div>
+              </div>
             </div>
           </div>
           <div class="selected-filters-container" id="selectedFiltersContainer" style="display: none;"></div>
@@ -318,9 +347,12 @@
         let selectedBrands = new Set();
         let selectedColors = new Set();
         let selectedMaterials = new Set();
+        let selectedGenders = new Set();
         let allBrands = new Set();
         let allColors = new Set();
         let allMaterials = new Set();
+        let allGenders = new Set();
+        let currentSortMode = 'relevance'; // 'relevance' | 'latest'
 
         // STATE 1: Initial State - hide results on first load
         if (dashboardResults) {
@@ -668,9 +700,14 @@
           selectedBrands.clear();
           selectedColors.clear();
           selectedMaterials.clear();
+          selectedGenders.clear();
           allBrands.clear();
           allColors.clear();
           allMaterials.clear();
+          allGenders.clear();
+          currentSortMode = 'relevance';
+          const sortSelectEl = document.getElementById('sortSelect');
+          if (sortSelectEl) sortSelectEl.value = 'relevance';
           if (resultsBody) {
             resultsBody.innerHTML =
               '<div class="results-empty">Results cleared. Run a new search to see recommendations.</div>';
@@ -703,6 +740,7 @@
           selectedBrands.clear();
           selectedColors.clear();
           selectedMaterials.clear();
+          selectedGenders.clear();
           if (resultsBody) {
             resultsBody.innerHTML =
               '<div class="results-empty">Searching Miros for matching products...</div>';
@@ -851,20 +889,8 @@
           const { reset = false, silent = false } = options;
           if (!Array.isArray(items)) return 0;
           
-          const totalItems = items.length;
-          let filteredByScoreCount = 0;
-          
           const normalized = items
             .filter(Boolean)
-            .filter((item) => {
-              // Filter products with score > 0.415
-              const score = item.score !== undefined && item.score !== null ? parseFloat(item.score) : 0;
-              const passesFilter = score > 0.415;
-              if (!passesFilter) {
-                filteredByScoreCount++;
-              }
-              return passesFilter;
-            })
             .map((item) => ({
               productTitle: item.productTitle || item.title || item.name || '-',
               optionId: item.optionId || item.option_id || item.itemId || item.item_id || '-',
@@ -873,14 +899,10 @@
               brand: item.brand || item.brandName || '',
               color: (item.payload && item.payload.color) ? item.payload.color : (item.color_name || item.color || item.colour || item.colour_name || ''),
               material: (item.payload && item.payload.material) ? item.payload.material : '',
+              gender: (item.payload && item.payload.gender) ? item.payload.gender : (item.gender || ''),
               payload: item.payload || null,
               score: item.score !== undefined && item.score !== null ? parseFloat(item.score) : 0,
             }));
-          
-          if (filteredByScoreCount > 0) {
-            console.log(`✅ Score filtering applied: ${filteredByScoreCount} products filtered out (score <= 0.415) out of ${totalItems} total`);
-            console.log(`📊 Products passing score filter (score > 0.415): ${normalized.length}`);
-          }
           
           let baseList = reset ? [] : Array.isArray(allProducts) ? [...allProducts] : [];
           const seenKeys = new Set(
@@ -1030,34 +1052,28 @@
           }
         }
 
-        // Fetch all products via Miros GraphQL API using recommendations query
-        // - Uses the 'recommendations' query which gets recommended products based on alias/item_id
-        // - Uses search term as 'alias' (customer product ID) to get recommendations
-        // - Fetches all available items with pagination
-        // - Deduplicates by URL/product ID
-        // - Returns all products found
+        // Fetch all products via Miros GraphQL API using the recommendations query
+        // - Uses AI-powered semantic similarity matching via text_query
+        // - payload field carries color, material, gender, online_date for filters & sort
+        // - No score cutoff — all returned products are shown
         async function fetchProductsViaAPI(rawValue) {
           if (!MIROS_API_KEY) {
             throw new Error('API key is required. Please configure MIROS_API_KEY.');
           }
-          
+
           const searchText = rawValue?.trim();
           if (!searchText) {
             throw new Error('Search term cannot be empty.');
           }
 
           const aggregated = [];
-          const seenKeys = new Set(); // Track seen products by URL or product ID
+          const seenKeys = new Set();
 
           console.log(`Starting API fetch for: "${searchText}"`);
 
           try {
-            // Use the recommendations query with text_query for text-based searches
-            // According to Miros documentation, use text_query for searching by text
-            // and alias for searching by specific product ID/alias
             console.log('Using recommendations query with text_query...');
-            
-            // Build the recommendations query matching the example structure
+
             const recommendationsQuery = `
               query CPSRecommendations($integration_id: String!, $text_query: String!, $text_query_language: String!, $limit: Int!) {
                 recommendations(query: {
@@ -1081,23 +1097,17 @@
                 }
               }
             `;
-            
-            console.log('Built recommendations query:', recommendationsQuery);
-            console.log(`Fetching recommendations for text query: "${searchText}"...`);
-            
-            // Execute the recommendations query
-            // Use text_query for text-based searches (not alias, which is for product IDs)
-            // Fetch up to 5,000 products in a single request (reduced from 10,000 to avoid server errors)
+
             const maxProductsToFetch = 5000;
-            
+
             console.log(`Fetching up to ${maxProductsToFetch} recommendations...`);
-            
+
             try {
               const data = await callMirosAPI(recommendationsQuery, {
                 integration_id: MIROS_INTEGRATION_ID,
-                text_query: searchText, // Use search term as text_query for text searches
-                text_query_language: "en", // Set language to English
-                limit: maxProductsToFetch // Request up to 5,000 products
+                text_query: searchText,
+                text_query_language: "en",
+                limit: maxProductsToFetch
               });
 
               const recommendations = data?.recommendations || [];
@@ -1106,20 +1116,12 @@
               if (!recommendations.length) {
                 console.log('No recommendations available.');
               } else {
-                // Process and deduplicate recommendations
                 let newItemsCount = 0;
                 let duplicateCount = 0;
-                let filteredByScoreCount = 0;
-                
+
                 for (const item of recommendations) {
-                  // Filter by score FIRST - only include products with score > 0.415
                   const score = item.score !== undefined && item.score !== null ? parseFloat(item.score) : 0;
-                  if (score <= 0.415) {
-                    filteredByScoreCount++;
-                    continue; // Skip items with score <= 0.415
-                  }
-                  
-                  // Transform to our format (recommendations returns: id, alias, name, url, image, brand, etc.)
+
                   const normalized = {
                     productTitle: item.name || item.alias || '-',
                     optionId: item.id || item.alias || '-',
@@ -1128,58 +1130,53 @@
                     brand: item.brand || '',
                     color: (item.payload && item.payload.color) ? item.payload.color : (item.color_name || item.color || ''),
                     material: (item.payload && item.payload.material) ? item.payload.material : '',
+                    gender: (item.payload && item.payload.gender) ? item.payload.gender : (item.gender || ''),
                     payload: item.payload || null,
                     score: score,
                   };
-                  
+
                   const key = (normalized.url || normalized.optionId || '').toLowerCase().trim();
-                  
+
                   if (!key || key === '-') {
                     console.warn('Skipping item with no URL or product ID:', normalized);
                     continue;
                   }
-                  
+
                   if (seenKeys.has(key)) {
                     duplicateCount++;
                     continue;
                   }
-                  
+
                   seenKeys.add(key);
                   aggregated.push(normalized);
                   newItemsCount++;
                 }
-                
-                console.log(`✅ Score filtering applied: ${filteredByScoreCount} products filtered out (score <= 0.415)`);
-                console.log(`Added ${newItemsCount} new items (score > 0.415), skipped ${duplicateCount} duplicates`);
-                console.log(`Total unique products after score filtering: ${aggregated.length}`);
+
+                console.log(`Added ${newItemsCount} items, skipped ${duplicateCount} duplicates. Total: ${aggregated.length}`);
               }
             } catch (error) {
-              console.error(`Error fetching recommendations:`, error);
-              // If we have some results, return them
+              console.error('Error fetching recommendations:', error);
               if (aggregated.length > 0) {
                 console.warn(`Returning ${aggregated.length} products despite error`);
               } else {
-                // If no results yet, throw the error
                 throw error;
               }
             }
-            
-            console.log(`✅ Recommendations fetch complete: ${aggregated.length} unique products found (max: ${maxProductsToFetch})`);
-            
+
+            console.log(`✅ Recommendations fetch complete: ${aggregated.length} unique products found`);
+
             if (aggregated.length === 0) {
               throw new Error('No recommendations returned from API. Try a different search term or check if products exist in the Miros database.');
             }
-            
+
             return aggregated;
-            
+
           } catch (error) {
-            console.error(`Error fetching recommendations:`, error);
-            // If we have some results, return what we have
+            console.error('Error fetching recommendations:', error);
             if (aggregated.length > 0) {
               console.warn(`Returning ${aggregated.length} products despite error`);
               return aggregated;
             }
-            // If no results yet, throw the error
             throw error;
           }
         }
@@ -2154,7 +2151,8 @@
 
           isLoadingMore = true;
           const nextBatch = Math.min(itemsPerLoad, allProducts.length - displayedProductsCount);
-          const itemsToAdd = allProducts.slice(displayedProductsCount, displayedProductsCount + nextBatch);
+          const itemsToAdd = allProducts
+            .slice(displayedProductsCount, displayedProductsCount + nextBatch);
           
           renderResults(itemsToAdd, true); // Append mode
           displayedProductsCount += nextBatch;
@@ -2224,7 +2222,7 @@
           const countElement = document.querySelector('#filtersHeaderResultsCount .filters-header-results-count__number');
           if (countElement) {
             // Check if any filters are active
-            const hasActiveFilters = selectedBrands.size > 0 || selectedColors.size > 0 || selectedMaterials.size > 0;
+            const hasActiveFilters = selectedBrands.size > 0 || selectedColors.size > 0 || selectedMaterials.size > 0 || selectedGenders.size > 0;
             
             // If filters are active, show filtered count, otherwise show total count
             const count = hasActiveFilters 
@@ -2757,6 +2755,7 @@
           allBrands.clear();
           allColors.clear();
           allMaterials.clear();
+          allGenders.clear();
           
           originalProducts.forEach(product => {
             if (product.brand && product.brand.trim()) {
@@ -2768,12 +2767,16 @@
             if (product.material && product.material.trim()) {
               allMaterials.add(product.material.trim());
             }
+            if (product.gender && product.gender.trim()) {
+              allGenders.add(product.gender.trim());
+            }
           });
           
           // Debug logging
           console.log('Extracted brands:', Array.from(allBrands));
           console.log('Extracted colors:', Array.from(allColors));
           console.log('Extracted materials:', Array.from(allMaterials));
+          console.log('Extracted genders:', Array.from(allGenders));
           
           // Update filter options based on current selections (synchronized filtering)
           updateSynchronizedFilterOptions();
@@ -2808,6 +2811,13 @@
               return material && selectedMaterials.has(material);
             });
           }
+
+          if (type !== 'gender' && selectedGenders.size > 0) {
+            filteredProducts = filteredProducts.filter(product => {
+              const gender = (product.gender || '').trim();
+              return gender && selectedGenders.has(gender);
+            });
+          }
           
           // Extract unique values for the requested filter type from filtered products
           const availableOptions = new Set();
@@ -2818,6 +2828,8 @@
               availableOptions.add(product.color.trim());
             } else if (type === 'material' && product.material && product.material.trim()) {
               availableOptions.add(product.material.trim());
+            } else if (type === 'gender' && product.gender && product.gender.trim()) {
+              availableOptions.add(product.gender.trim());
             }
           });
           
@@ -2830,11 +2842,13 @@
           const availableBrands = getAvailableFilterOptions('brand');
           const availableColors = getAvailableFilterOptions('color');
           const availableMaterials = getAvailableFilterOptions('material');
+          const availableGenders = getAvailableFilterOptions('gender');
           
           // Populate filter options with synchronized data
           populateFilterOptions('brand', availableBrands);
           populateFilterOptions('color', availableColors);
           populateFilterOptions('material', availableMaterials);
+          populateFilterOptions('gender', availableGenders);
         }
 
         // Populate filter dropdown options
@@ -2870,7 +2884,7 @@
             checkbox.type = 'checkbox';
             checkbox.id = `${type}-${option}`;
             checkbox.value = option;
-            const selectedSet = type === 'brand' ? selectedBrands : (type === 'color' ? selectedColors : (type === 'material' ? selectedMaterials : new Set()));
+            const selectedSet = type === 'brand' ? selectedBrands : (type === 'color' ? selectedColors : (type === 'material' ? selectedMaterials : (type === 'gender' ? selectedGenders : new Set())));
             checkbox.checked = selectedSet.has(option);
             if (checkbox.checked) {
               optionEl.classList.add('selected');
@@ -2895,6 +2909,12 @@
                   selectedMaterials.add(value);
                 } else {
                   selectedMaterials.delete(value);
+                }
+              } else if (type === 'gender') {
+                if (e.target.checked) {
+                  selectedGenders.add(value);
+                } else {
+                  selectedGenders.delete(value);
                 }
               }
               
@@ -2934,11 +2954,13 @@
           updateFilterSelectedDisplay('color', selectedColors);
           // Update material filter selected display
           updateFilterSelectedDisplay('material', selectedMaterials);
+          // Update gender filter selected display
+          updateFilterSelectedDisplay('gender', selectedGenders);
           
           // Show/hide clear button
           const clearBtn = document.getElementById('clearFiltersBtn');
           if (clearBtn) {
-            clearBtn.style.display = (selectedBrands.size > 0 || selectedColors.size > 0 || selectedMaterials.size > 0) ? 'block' : 'none';
+            clearBtn.style.display = (selectedBrands.size > 0 || selectedColors.size > 0 || selectedMaterials.size > 0 || selectedGenders.size > 0) ? 'block' : 'none';
           }
         }
 
@@ -2962,7 +2984,7 @@
               if (selectedSet.size > 0) {
                 placeholder.textContent = `${selectedSet.size} selected`;
               } else {
-                const placeholderText = type === 'brand' ? 'Select brands...' : (type === 'color' ? 'Select colors...' : (type === 'material' ? 'Select materials...' : 'Select...'));
+                const placeholderText = type === 'brand' ? 'Select brands...' : (type === 'color' ? 'Select colors...' : (type === 'material' ? 'Select materials...' : (type === 'gender' ? 'Select genders...' : 'Select...')));
                 placeholder.textContent = placeholderText;
               }
             }
@@ -3013,6 +3035,8 @@
                   selectedColors.delete(filterValue);
                 } else if (filterType === 'material') {
                   selectedMaterials.delete(filterValue);
+                } else if (filterType === 'gender') {
+                  selectedGenders.delete(filterValue);
                 }
                 // Update synchronized filter options when a filter tag is removed
                 updateSynchronizedFilterOptions();
@@ -3021,6 +3045,24 @@
               });
             });
           }
+        }
+
+        // Extract creation timestamp (ms) from product payload
+        function getProductTimestamp(item) {
+          if (!item.payload) return 0;
+          const p = item.payload;
+          const raw = p.online_date ?? p.created_at ?? p.creation_date ?? p.launch_date ?? p.date ?? null;
+          if (raw == null) return 0;
+          return Number(raw);
+        }
+
+        // Sort helper — operates on a copy, does not mutate
+        function sortProducts(products) {
+          if (currentSortMode === 'latest') {
+            return [...products].sort((a, b) => getProductTimestamp(b) - getProductTimestamp(a));
+          }
+          // 'relevance': highest score first
+          return [...products].sort((a, b) => (b.score || 0) - (a.score || 0));
         }
 
         // Apply filters to products
@@ -3052,7 +3094,18 @@
               return material && selectedMaterials.has(material);
             });
           }
+
+          // Apply gender filter
+          if (selectedGenders.size > 0) {
+            filtered = filtered.filter(product => {
+              const gender = (product.gender || '').trim();
+              return gender && selectedGenders.has(gender);
+            });
+          }
           
+          // Apply sort before rendering
+          filtered = sortProducts(filtered);
+
           // Update displayed products with filtered results
           displayedProductsCount = 0;
           allProducts = filtered; // Use filtered for rendering
@@ -3078,7 +3131,7 @@
 
         // Setup filter dropdown toggles
         function setupFilterDropdowns() {
-          ['brand', 'color', 'material'].forEach(type => {
+          ['brand', 'color', 'material', 'gender'].forEach(type => {
             const selectedEl = document.getElementById(`${type}FilterSelected`);
             const dropdownEl = document.getElementById(`${type}FilterDropdown`);
             
@@ -3138,6 +3191,7 @@
               selectedBrands.clear();
               selectedColors.clear();
               selectedMaterials.clear();
+              selectedGenders.clear();
               
               // Uncheck all brand filter checkboxes
               const brandFilterOptions = document.getElementById('brandFilterOptions');
@@ -3169,6 +3223,19 @@
               const materialFilterOptions = document.getElementById('materialFilterOptions');
               if (materialFilterOptions) {
                 const checkboxes = materialFilterOptions.querySelectorAll('input[type="checkbox"]');
+                checkboxes.forEach(checkbox => {
+                  checkbox.checked = false;
+                  const optionEl = checkbox.closest('.filter-option');
+                  if (optionEl) {
+                    optionEl.classList.remove('selected');
+                  }
+                });
+              }
+
+              // Uncheck all gender filter checkboxes
+              const genderFilterOptions = document.getElementById('genderFilterOptions');
+              if (genderFilterOptions) {
+                const checkboxes = genderFilterOptions.querySelectorAll('input[type="checkbox"]');
                 checkboxes.forEach(checkbox => {
                   checkbox.checked = false;
                   const optionEl = checkbox.closest('.filter-option');
@@ -3395,6 +3462,15 @@
 
         // Initialize filter dropdowns
         setupFilterDropdowns();
+
+        // Sort dropdown
+        const sortSelect = document.getElementById('sortSelect');
+        if (sortSelect) {
+          sortSelect.addEventListener('change', () => {
+            currentSortMode = sortSelect.value;
+            applyFilters();
+          });
+        }
         
         // Initialize Miros buttons on page load
         initializeMirosButtons();
