@@ -937,30 +937,28 @@
           console.log(`📦 Products after deduplication: ${allProducts.length} total, ${deduped.length} new`);
           console.log(`📦 Original products stored: ${originalProducts.length}`);
           
-          // Extract filter options after products are added (before rendering)
-          extractFilterOptions();
-          
+          // Extract filter options — wrapped so a failure never blocks rendering
+          try {
+            extractFilterOptions();
+          } catch (filterErr) {
+            console.error('⚠️ extractFilterOptions failed (filters may be empty):', filterErr);
+          }
+
           // Update product count display
-          updateProductCountDisplay();
-          
-          // Initialize infinite scroll with new products - render immediately
-          if (reset || displayedProductsCount === 0) {
-            // Ensure we render products immediately after they're added
-            if (allProducts.length > 0) {
-              console.log(`🚀 Initializing infinite scroll with ${allProducts.length} products`);
-              initializeInfiniteScroll();
-            } else {
-              // No products, show empty message
-              console.warn('⚠️ No products to render');
-              if (resultsBody) {
-                resultsBody.innerHTML = '<div class="results-empty">No results found. Try a different URL, SKU, or product attribute.</div>';
-              }
-            }
+          try {
+            updateProductCountDisplay();
+          } catch (e) { /* non-critical */ }
+
+          // Always render — guaranteed regardless of filter extraction outcome
+          if (allProducts.length > 0) {
+            console.log(`🚀 Initializing infinite scroll with ${allProducts.length} products`);
+            displayedProductsCount = 0;
+            initializeInfiniteScroll();
           } else {
-            // If we already have products displayed, just update the count
-            // User can scroll to load more
-            summariseResults(allProducts.length);
-            updatePaginationInfo();
+            console.warn('⚠️ No products to render');
+            if (resultsBody) {
+              resultsBody.innerHTML = '<div class="results-empty">No results found. Try a different URL, SKU, or product attribute.</div>';
+            }
           }
           
           if (!silent) {
@@ -2758,28 +2756,25 @@
           allGenders.clear();
           
           originalProducts.forEach(product => {
-            if (product.brand && product.brand.trim()) {
-              allBrands.add(product.brand.trim());
-            }
-            if (product.color && product.color.trim()) {
-              allColors.add(product.color.trim());
-            }
-            if (product.material && product.material.trim()) {
-              allMaterials.add(product.material.trim());
-            }
-            if (product.gender && product.gender.trim()) {
-              allGenders.add(product.gender.trim());
-            }
+            try {
+              if (product.brand && product.brand.trim()) allBrands.add(product.brand.trim());
+              if (product.color && product.color.trim()) allColors.add(product.color.trim());
+              if (product.material && product.material.trim()) allMaterials.add(product.material.trim());
+              if (product.gender && product.gender.trim()) allGenders.add(product.gender.trim());
+            } catch (e) { /* skip malformed product */ }
           });
           
-          // Debug logging
           console.log('Extracted brands:', Array.from(allBrands));
           console.log('Extracted colors:', Array.from(allColors));
           console.log('Extracted materials:', Array.from(allMaterials));
           console.log('Extracted genders:', Array.from(allGenders));
           
           // Update filter options based on current selections (synchronized filtering)
-          updateSynchronizedFilterOptions();
+          try {
+            updateSynchronizedFilterOptions();
+          } catch (e) {
+            console.error('⚠️ updateSynchronizedFilterOptions failed:', e);
+          }
           
           // Filters container is always visible in filters header
           // No need to conditionally show/hide it based on products
@@ -2791,30 +2786,32 @@
           let filteredProducts = [...originalProducts];
           
           // Apply filters from OTHER filter types (not the one we're calculating for)
+          const strTrim = (v) => v != null ? String(v).trim() : '';
+
           if (type !== 'brand' && selectedBrands.size > 0) {
             filteredProducts = filteredProducts.filter(product => {
-              const brand = (product.brand || '').trim();
+              const brand = strTrim(product.brand);
               return brand && selectedBrands.has(brand);
             });
           }
           
           if (type !== 'color' && selectedColors.size > 0) {
             filteredProducts = filteredProducts.filter(product => {
-              const color = (product.color || '').trim();
+              const color = strTrim(product.color);
               return color && selectedColors.has(color);
             });
           }
           
           if (type !== 'material' && selectedMaterials.size > 0) {
             filteredProducts = filteredProducts.filter(product => {
-              const material = (product.material || '').trim();
+              const material = strTrim(product.material);
               return material && selectedMaterials.has(material);
             });
           }
 
           if (type !== 'gender' && selectedGenders.size > 0) {
             filteredProducts = filteredProducts.filter(product => {
-              const gender = (product.gender || '').trim();
+              const gender = strTrim(product.gender);
               return gender && selectedGenders.has(gender);
             });
           }
@@ -2822,15 +2819,13 @@
           // Extract unique values for the requested filter type from filtered products
           const availableOptions = new Set();
           filteredProducts.forEach(product => {
-            if (type === 'brand' && product.brand && product.brand.trim()) {
-              availableOptions.add(product.brand.trim());
-            } else if (type === 'color' && product.color && product.color.trim()) {
-              availableOptions.add(product.color.trim());
-            } else if (type === 'material' && product.material && product.material.trim()) {
-              availableOptions.add(product.material.trim());
-            } else if (type === 'gender' && product.gender && product.gender.trim()) {
-              availableOptions.add(product.gender.trim());
-            }
+            try {
+              const val = (v) => v != null ? String(v).trim() : '';
+              if (type === 'brand') { const v = val(product.brand); if (v) availableOptions.add(v); }
+              else if (type === 'color') { const v = val(product.color); if (v) availableOptions.add(v); }
+              else if (type === 'material') { const v = val(product.material); if (v) availableOptions.add(v); }
+              else if (type === 'gender') { const v = val(product.gender); if (v) availableOptions.add(v); }
+            } catch (e) { /* skip malformed product */ }
           });
           
           return Array.from(availableOptions).sort();
@@ -3070,11 +3065,13 @@
           // Always use originalProducts for filtering (preserve full dataset)
           const sourceProducts = originalProducts.length > 0 ? originalProducts : allProducts;
           
+          const s = (v) => v != null ? String(v).trim() : '';
+
           // Apply brand filter
           let filtered = sourceProducts;
           if (selectedBrands.size > 0) {
             filtered = filtered.filter(product => {
-              const brand = (product.brand || '').trim();
+              const brand = s(product.brand);
               return brand && selectedBrands.has(brand);
             });
           }
@@ -3082,7 +3079,7 @@
           // Apply color filter
           if (selectedColors.size > 0) {
             filtered = filtered.filter(product => {
-              const color = (product.color || '').trim();
+              const color = s(product.color);
               return color && selectedColors.has(color);
             });
           }
@@ -3090,7 +3087,7 @@
           // Apply material filter
           if (selectedMaterials.size > 0) {
             filtered = filtered.filter(product => {
-              const material = (product.material || '').trim();
+              const material = s(product.material);
               return material && selectedMaterials.has(material);
             });
           }
@@ -3098,7 +3095,7 @@
           // Apply gender filter
           if (selectedGenders.size > 0) {
             filtered = filtered.filter(product => {
-              const gender = (product.gender || '').trim();
+              const gender = s(product.gender);
               return gender && selectedGenders.has(gender);
             });
           }
