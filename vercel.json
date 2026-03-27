@@ -1,13 +1,14 @@
 {
   "version": 2,
   "name": "miros-collection-builder",
-  "functions": {
-    "api/serve.js": {
-      "includeFiles": "index.html"
-    }
-  },
   "builds": [
-    { "src": "api/*.js", "use": "@vercel/node" },
+    {
+      "src": "api/serve.js",
+      "use": "@vercel/node",
+      "config": { "includeFiles": ["index.html"] }
+    },
+    { "src": "api/login.js", "use": "@vercel/node" },
+    { "src": "api/logout.js", "use": "@vercel/node" },
     { "src": "login.html", "use": "@vercel/static" },
     { "src": "styles.css", "use": "@vercel/static" },
     { "src": "add_photo_alternate.svg", "use": "@vercel/static" },
