@@ -1,16 +1,25 @@
 {
   "version": 2,
   "name": "miros-collection-builder",
-  "public": true,
+  "functions": {
+    "api/serve.js": {
+      "includeFiles": "index.html"
+    }
+  },
   "builds": [
-    { "src": "index.html", "use": "@vercel/static" },
+    { "src": "api/*.js", "use": "@vercel/node" },
+    { "src": "login.html", "use": "@vercel/static" },
     { "src": "styles.css", "use": "@vercel/static" },
     { "src": "add_photo_alternate.svg", "use": "@vercel/static" },
     { "src": "CPLogo.png", "use": "@vercel/static" }
   ],
   "routes": [
-    { "handle": "filesystem" },
-    { "src": "/.*", "dest": "/index.html" }
+    { "src": "/api/login", "dest": "/api/login.js" },
+    { "src": "/api/logout", "dest": "/api/logout.js" },
+    { "src": "/login.html", "dest": "/login.html" },
+    { "src": "/styles.css", "dest": "/styles.css" },
+    { "src": "/add_photo_alternate.svg", "dest": "/add_photo_alternate.svg" },
+    { "src": "/CPLogo.png", "dest": "/CPLogo.png" },
+    { "src": "/(.*)", "dest": "/api/serve.js" }
   ]
 }
-

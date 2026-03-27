@@ -1066,58 +1066,70 @@
 
           const aggregated = [];
           const seenKeys = new Set();
+          const ACTIVE_RESOLVER = 'search'; // 'search' | 'recommendations'
 
+          console.log(`%c🔍 Active resolver: ${ACTIVE_RESOLVER}`, 'color: #00bcd4; font-weight: bold; font-size: 13px;');
           console.log(`Starting API fetch for: "${searchText}"`);
 
           try {
-            console.log('Using recommendations query with text_query...');
+            console.log('Using search query with text_query...');
 
-            const recommendationsQuery = `
-              query CPSRecommendations($integration_id: String!, $text_query: String!, $text_query_language: String!, $limit: Int!) {
-                recommendations(query: {
+            const searchQuery = `
+              query SearchProducts($integration_id: String!, $text_query: String!, $text_query_language: String!, $limit: Int!, $skip: Int!) {
+                search(query: {
                   integration_id: $integration_id,
                   text_query: $text_query,
                   text_query_language: $text_query_language,
-                  limit: $limit
+                  limit: $limit,
+                  skip: $skip,
+                  sort: { field: score, order: desc }
                 }) {
-                  id
-                  alias
-                  name
-                  url
-                  image
-                  brand
-                  category_id
-                  color_name
-                  price
-                  price_discounted
-                  score
-                  payload
+                  data {
+                    id
+                    alias
+                    name
+                    url
+                    image
+                    brand
+                    category_id
+                    color_name
+                    price
+                    price_discounted
+                    score
+                    payload
+                  }
+                  has_more
+                  approximate_hits
                 }
               }
             `;
 
-            const maxProductsToFetch = 5000;
+            const batchSize = 200;
+            let skip = 0;
+            let hasMore = true;
 
-            console.log(`Fetching up to ${maxProductsToFetch} recommendations...`);
+            console.log(`Fetching all available products via search (batches of ${batchSize}, no upper limit)...`);
 
-            try {
-              const data = await callMirosAPI(recommendationsQuery, {
-                integration_id: MIROS_INTEGRATION_ID,
-                text_query: searchText,
-                text_query_language: "en",
-                limit: maxProductsToFetch
-              });
+            while (hasMore) {
+              try {
+                const data = await callMirosAPI(searchQuery, {
+                  integration_id: MIROS_INTEGRATION_ID,
+                  text_query: searchText,
+                  text_query_language: "en",
+                  limit: batchSize,
+                  skip: skip
+                });
 
-              const recommendations = data?.recommendations || [];
-              console.log(`Received ${recommendations.length} recommendations from API`);
+                const results = data?.search?.data || [];
+                hasMore = data?.search?.has_more === true;
+                console.log(`Batch skip=${skip}: received ${results.length} results, has_more=${hasMore}, approximate_hits=${data?.search?.approximate_hits}`);
 
-              if (!recommendations.length) {
-                console.log('No recommendations available.');
-              } else {
+                if (!results.length) break;
+
                 let newItemsCount = 0;
                 let duplicateCount = 0;
 
-                for (const item of recommendations) {
+                for (const item of results) {
                   const score = item.score !== undefined && item.score !== null ? parseFloat(item.score) : 0;
 
                   const normalized = {
@@ -1150,27 +1162,33 @@
                   newItemsCount++;
                 }
 
-                console.log(`Added ${newItemsCount} items, skipped ${duplicateCount} duplicates. Total: ${aggregated.length}`);
-              }
-            } catch (error) {
-              console.error('Error fetching recommendations:', error);
-              if (aggregated.length > 0) {
-                console.warn(`Returning ${aggregated.length} products despite error`);
-              } else {
+                console.log(`Batch skip=${skip}: added ${newItemsCount}, skipped ${duplicateCount} duplicates. Total so far: ${aggregated.length}`);
+
+                skip += batchSize;
+
+                // Stop if this batch returned fewer items than requested (no more pages)
+                if (results.length < batchSize) break;
+
+              } catch (error) {
+                console.error(`Error fetching search batch at skip=${skip}:`, error);
+                if (aggregated.length > 0) {
+                  console.warn(`Stopping pagination early, returning ${aggregated.length} products`);
+                  break;
+                }
                 throw error;
               }
             }
 
-            console.log(`✅ Recommendations fetch complete: ${aggregated.length} unique products found`);
+            console.log(`✅ Search fetch complete: ${aggregated.length} unique products found`);
 
             if (aggregated.length === 0) {
-              throw new Error('No recommendations returned from API. Try a different search term or check if products exist in the Miros database.');
+              throw new Error('No results returned from API. Try a different search term or check if products exist in the Miros database.');
             }
 
             return aggregated;
 
           } catch (error) {
-            console.error('Error fetching recommendations:', error);
+            console.error('Error fetching search results:', error);
             if (aggregated.length > 0) {
               console.warn(`Returning ${aggregated.length} products despite error`);
               return aggregated;
