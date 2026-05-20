@@ -61,20 +61,15 @@
                   aria-label="Search for a product attribute"
                 />
               </div>
-              <div class="dashboard__category-wrapper" style="display: none;">
-                <select
-                  class="dashboard__select"
-                  id="categorySelect"
-                  aria-label="Select product category"
-                  disabled
-                >
-                  <option value="Fashion">Fashion</option>
-                  <option value="Womenswear">Womenswear</option>
-                  <option value="Menswear">Menswear</option>
-                  <option value="Accessories">Accessories</option>
-                  <option value="Footwear">Footwear</option>
-                </select>
-              </div>
+              <select
+                class="dashboard__select dashboard__select--hidden"
+                id="categorySelect"
+                aria-label="Select product category"
+                aria-hidden="true"
+                tabindex="-1"
+              >
+                <option value="">All Categories</option>
+              </select>
               <div
                 id="mirosEntry"
                 data-miros-entry="miros-on-search"
@@ -95,86 +90,184 @@
       <!-- Scroll-Reactive Filters Header -->
       <div class="dashboard__filters-header" id="filtersHeader" style="display: none;">
         <div class="dashboard__filters-header-content">
-          <div class="dashboard__filters-header-top-row">
-            <div class="filters-container" id="filtersContainer" style="display: flex;">
-              <div class="filters-left">
-                <div class="filter-group">
-                  <label class="filter-label">Brand</label>
-                  <div class="filter-multiselect" id="brandFilter">
-                    <div class="filter-multiselect__selected" id="brandFilterSelected">
-                      <span class="filter-placeholder">Select brands...</span>
-                    </div>
-                    <div class="filter-multiselect__dropdown" id="brandFilterDropdown" style="display: none;">
-                      <div class="filter-multiselect__search">
-                        <input type="text" id="brandFilterSearch" placeholder="Search brands..." class="filter-search-input">
-                      </div>
-                      <div class="filter-multiselect__options" id="brandFilterOptions"></div>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="filter-group">
-                  <label class="filter-label">Color</label>
-                  <div class="filter-multiselect" id="colorFilter">
-                    <div class="filter-multiselect__selected" id="colorFilterSelected">
-                      <span class="filter-placeholder">Select colors...</span>
-                    </div>
-                    <div class="filter-multiselect__dropdown" id="colorFilterDropdown" style="display: none;">
-                      <div class="filter-multiselect__search">
-                        <input type="text" id="colorFilterSearch" placeholder="Search colors..." class="filter-search-input">
-                      </div>
-                      <div class="filter-multiselect__options" id="colorFilterOptions"></div>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="filter-group">
-                  <label class="filter-label">Material</label>
-                  <div class="filter-multiselect" id="materialFilter">
-                    <div class="filter-multiselect__selected" id="materialFilterSelected">
-                      <span class="filter-placeholder">Select materials...</span>
-                    </div>
-                    <div class="filter-multiselect__dropdown" id="materialFilterDropdown" style="display: none;">
-                      <div class="filter-multiselect__search">
-                        <input type="text" id="materialFilterSearch" placeholder="Search materials..." class="filter-search-input">
-                      </div>
-                      <div class="filter-multiselect__options" id="materialFilterOptions"></div>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="filter-group">
-                  <label class="filter-label">Gender</label>
-                  <div class="filter-multiselect" id="genderFilter">
-                    <div class="filter-multiselect__selected" id="genderFilterSelected">
-                      <span class="filter-placeholder">Select genders...</span>
-                    </div>
-                    <div class="filter-multiselect__dropdown" id="genderFilterDropdown" style="display: none;">
-                      <div class="filter-multiselect__search">
-                        <input type="text" id="genderFilterSearch" placeholder="Search genders..." class="filter-search-input">
-                      </div>
-                      <div class="filter-multiselect__options" id="genderFilterOptions"></div>
-                    </div>
-                  </div>
-                </div>
-
-                <button type="button" class="filter-clear-btn" id="clearFiltersBtn" style="display: none;">
-                  Clear Filters
-                </button>
-              </div>
-
-              <div class="filters-right">
-                <div class="filter-group">
-                  <label class="filter-label">Sort By</label>
-                  <select id="sortSelect" class="filter-sort-select">
-                    <option value="relevance">Relevance</option>
-                    <option value="latest">New Arrivals</option>
-                  </select>
-                </div>
+          <div class="filters-bar">
+            <div class="filters-bar__left">
+              <button type="button" class="filters-bar__trigger" id="filtersDrawerTrigger" aria-haspopup="dialog" aria-expanded="false" aria-controls="filtersDrawer">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <line x1="4" y1="6" x2="20" y2="6"/>
+                  <line x1="7" y1="12" x2="17" y2="12"/>
+                  <line x1="10" y1="18" x2="14" y2="18"/>
+                </svg>
+                <span>Filters</span>
+                <span class="filters-bar__badge" id="filtersBarBadge" style="display:none;">0</span>
+              </button>
+              <div class="filters-bar__chips" id="selectedFiltersContainer"></div>
+              <button type="button" class="filters-bar__clear" id="clearFiltersBtn" style="display: none;" aria-label="Clear all filters">
+                Clear all
+              </button>
+            </div>
+            <div class="filters-bar__right">
+              <label class="filters-bar__sort-label" for="sortSelect">Sort</label>
+              <div class="filters-bar__sort-wrap">
+                <select id="sortSelect" class="filter-sort-select">
+                  <option value="relevance">Relevance</option>
+                  <option value="latest">New Arrivals</option>
+                </select>
               </div>
             </div>
           </div>
-          <div class="selected-filters-container" id="selectedFiltersContainer" style="display: none;"></div>
+        </div>
+      </div>
+
+      <!-- Filters Drawer -->
+      <div class="filters-drawer" id="filtersDrawer" role="dialog" aria-modal="true" aria-labelledby="filtersDrawerTitle" aria-hidden="true">
+        <div class="filters-drawer__scrim" data-drawer-close></div>
+        <aside class="filters-drawer__panel" tabindex="-1">
+          <header class="filters-drawer__header">
+            <h2 class="filters-drawer__title" id="filtersDrawerTitle">Filters</h2>
+            <button type="button" class="filters-drawer__close" data-drawer-close aria-label="Close filters">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </header>
+          <div class="filters-drawer__body" id="filtersDrawerBody">
+            <!-- Category -->
+            <section class="drawer-section" data-section="category">
+              <button type="button" class="drawer-section__head" aria-expanded="true">
+                <span class="drawer-section__title">Category</span>
+                <span class="drawer-section__meta" id="drawerMetaCategory"></span>
+                <svg class="drawer-section__chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="6 9 12 15 18 9"/>
+                </svg>
+              </button>
+              <div class="drawer-section__body" id="drawerBodyCategory"></div>
+            </section>
+
+            <!-- Gender -->
+            <section class="drawer-section" data-section="gender">
+              <button type="button" class="drawer-section__head" aria-expanded="true">
+                <span class="drawer-section__title">Gender</span>
+                <span class="drawer-section__meta" id="drawerMetaGender"></span>
+                <svg class="drawer-section__chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="6 9 12 15 18 9"/>
+                </svg>
+              </button>
+              <div class="drawer-section__body"></div>
+            </section>
+
+            <!-- Size (API filter via search sizes: [...]) -->
+            <section class="drawer-section" data-section="size">
+              <button type="button" class="drawer-section__head" aria-expanded="false">
+                <span class="drawer-section__title">Size</span>
+                <span class="drawer-section__meta" id="drawerMetaSize"></span>
+                <svg class="drawer-section__chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="6 9 12 15 18 9"/>
+                </svg>
+              </button>
+              <div class="drawer-section__body"></div>
+            </section>
+
+            <!-- Brand -->
+            <section class="drawer-section" data-section="brand">
+              <button type="button" class="drawer-section__head" aria-expanded="false">
+                <span class="drawer-section__title">Brand</span>
+                <span class="drawer-section__meta" id="drawerMetaBrand"></span>
+                <svg class="drawer-section__chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="6 9 12 15 18 9"/>
+                </svg>
+              </button>
+              <div class="drawer-section__body"></div>
+            </section>
+
+            <!-- Color -->
+            <section class="drawer-section" data-section="color">
+              <button type="button" class="drawer-section__head" aria-expanded="false">
+                <span class="drawer-section__title">Color</span>
+                <span class="drawer-section__meta" id="drawerMetaColor"></span>
+                <svg class="drawer-section__chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="6 9 12 15 18 9"/>
+                </svg>
+              </button>
+              <div class="drawer-section__body"></div>
+            </section>
+
+            <!-- Material -->
+            <section class="drawer-section" data-section="material">
+              <button type="button" class="drawer-section__head" aria-expanded="false">
+                <span class="drawer-section__title">Material</span>
+                <span class="drawer-section__meta" id="drawerMetaMaterial"></span>
+                <svg class="drawer-section__chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="6 9 12 15 18 9"/>
+                </svg>
+              </button>
+              <div class="drawer-section__body"></div>
+            </section>
+          </div>
+          <footer class="filters-drawer__footer">
+            <button type="button" class="filters-drawer__btn filters-drawer__btn--ghost" id="drawerClearAll">Clear all</button>
+            <button type="button" class="filters-drawer__btn filters-drawer__btn--primary" id="drawerApply">Show results</button>
+          </footer>
+        </aside>
+      </div>
+
+      <!-- Hidden filters container (preserves existing JS bindings; elements relocated into drawer at runtime) -->
+      <div class="filters-container filters-container--hidden" id="filtersContainer" aria-hidden="true">
+        <div class="filter-group" id="brandFilter">
+          <div class="filter-multiselect">
+            <div class="filter-multiselect__selected" id="brandFilterSelected"><span class="filter-placeholder">Select brands...</span></div>
+            <div class="filter-multiselect__dropdown" id="brandFilterDropdown" style="display:none;">
+              <div class="filter-multiselect__search">
+                <input type="text" id="brandFilterSearch" placeholder="Search brands..." class="filter-search-input">
+              </div>
+              <div class="filter-multiselect__options" id="brandFilterOptions"></div>
+            </div>
+          </div>
+        </div>
+        <div class="filter-group" id="colorFilter">
+          <div class="filter-multiselect">
+            <div class="filter-multiselect__selected" id="colorFilterSelected"><span class="filter-placeholder">Select colors...</span></div>
+            <div class="filter-multiselect__dropdown" id="colorFilterDropdown" style="display:none;">
+              <div class="filter-multiselect__search">
+                <input type="text" id="colorFilterSearch" placeholder="Search colors..." class="filter-search-input">
+              </div>
+              <div class="filter-multiselect__options" id="colorFilterOptions"></div>
+            </div>
+          </div>
+        </div>
+        <div class="filter-group" id="materialFilter">
+          <div class="filter-multiselect">
+            <div class="filter-multiselect__selected" id="materialFilterSelected"><span class="filter-placeholder">Select materials...</span></div>
+            <div class="filter-multiselect__dropdown" id="materialFilterDropdown" style="display:none;">
+              <div class="filter-multiselect__search">
+                <input type="text" id="materialFilterSearch" placeholder="Search materials..." class="filter-search-input">
+              </div>
+              <div class="filter-multiselect__options" id="materialFilterOptions"></div>
+            </div>
+          </div>
+        </div>
+        <div class="filter-group" id="genderFilter">
+          <div class="filter-multiselect">
+            <div class="filter-multiselect__selected" id="genderFilterSelected"><span class="filter-placeholder">Select genders...</span></div>
+            <div class="filter-multiselect__dropdown" id="genderFilterDropdown" style="display:none;">
+              <div class="filter-multiselect__search">
+                <input type="text" id="genderFilterSearch" placeholder="Search genders..." class="filter-search-input">
+              </div>
+              <div class="filter-multiselect__options" id="genderFilterOptions"></div>
+            </div>
+          </div>
+        </div>
+        <div class="filter-group" id="sizeFilter">
+          <div class="filter-multiselect">
+            <div class="filter-multiselect__selected" id="sizeFilterSelected"><span class="filter-placeholder">Select sizes...</span></div>
+            <div class="filter-multiselect__dropdown" id="sizeFilterDropdown" style="display:none;">
+              <div class="filter-multiselect__search">
+                <input type="text" id="sizeFilterSearch" placeholder="Search sizes..." class="filter-search-input">
+              </div>
+              <div class="filter-multiselect__options" id="sizeFilterOptions"></div>
+            </div>
+          </div>
         </div>
       </div>
       <p class="dashboard__status" id="statusMessage" aria-live="polite"></p>
@@ -342,17 +435,29 @@
         let lastStatusUpdate = 0;
         let lastStatusText = "";
         let currentSearchQuery = ""; // Store current search query for filename generation
+        let currentSearchImageUrl = null; // Set when search is driven by pasted/uploaded image (recommendations image_url)
         
         // Filter state
         let selectedBrands = new Set();
         let selectedColors = new Set();
         let selectedMaterials = new Set();
         let selectedGenders = new Set();
+        let selectedSizes = new Set(); // API filter — sent as search(query: { sizes: [...] })
+        // Category filter: multi-select with an "All categories" toggle.
+        //   mode === 'all'   → "All" checked, individuals disabled, set is empty
+        //   mode === 'multi' → "All" unchecked, individuals enabled; set may be any size
+        // When the last individual is removed in multi mode we auto-revert to 'all'.
+        let selectedCategories = new Set();
+        let categoryFilterMode = 'all';
         let allBrands = new Set();
         let allColors = new Set();
         let allMaterials = new Set();
         let allGenders = new Set();
+        let allSizes = new Set();
+        let allCategories = new Set();
+        const categoryNameCache = new Map();
         let currentSortMode = 'relevance'; // 'relevance' | 'latest'
+        let _sizeRefetchPromise = null;
 
         // STATE 1: Initial State - hide results on first load
         if (dashboardResults) {
@@ -508,11 +613,102 @@
           });
         }
 
+        const uploadImageToMiros = (file) => new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve({ imageUrl: e.target.result });
+          reader.onerror = () => reject(new Error('Failed to read image file'));
+          reader.readAsDataURL(file);
+        });
+
+        async function handleSearchPaste(e, inputEl, onUrlPasted) {
+          const clipboard = e.clipboardData;
+          if (!clipboard) return;
+
+          const imageItem = Array.from(clipboard.items || []).find((item) => item.type.startsWith('image/'));
+          if (imageItem) {
+            e.preventDefault();
+            const file = imageItem.getAsFile();
+            if (!file) return;
+            try {
+              const { imageUrl } = await uploadImageToMiros(file);
+              if (inputEl) inputEl.value = 'Image search';
+              if (searchInput && inputEl !== searchInput) searchInput.value = 'Image search';
+              if (inputEl === landingSearchInput && !hasSearched) {
+                showResultsSection();
+              }
+              await performImageSearch(imageUrl);
+            } catch (err) {
+              console.error('Image paste failed:', err);
+              showStatus(err.message || 'Failed to process pasted image.', 'error');
+              setTimeout(() => clearStatus(), 4000);
+            }
+            return;
+          }
+
+          setTimeout(() => {
+            const pastedValue = (inputEl && inputEl.value ? inputEl.value.trim() : '');
+            if (pastedValue && (pastedValue.startsWith('http') || pastedValue.includes('/p/'))) {
+              if (typeof onUrlPasted === 'function') onUrlPasted();
+            }
+          }, 10);
+        }
+
+        async function performImageSearch(imageUrl) {
+          clearStatus();
+          if (!imageUrl) {
+            showStatus('No image to search.', 'error');
+            return;
+          }
+
+          currentSearchImageUrl = imageUrl;
+          currentSearchQuery = '[Image search]';
+          if (searchInput) searchInput.value = 'Image search';
+
+          if (!hasSearched) {
+            showResultsSection();
+          }
+
+          prepareResultsForNewSearch();
+
+          if (!MIROS_API_KEY) {
+            showStatus('API key is required. Please configure MIROS_API_KEY.', 'error');
+            setTimeout(() => clearStatus(), 3000);
+            return;
+          }
+
+          showStatus('Searching by image via Miros API…', 'pending');
+          try {
+            const apiResults = await fetchProductsViaAPI('', { imageUrl });
+            if (apiResults.length > 0) {
+              appendUniqueProducts(apiResults, { reset: true, silent: false });
+              showStatus(`Successfully loaded ${allProducts.length} products from image search.`, 'success');
+              if (ENABLE_MIROS_OVERLAY_BUTTON) {
+                prepareEntry({ 'image-url': imageUrl, item: '', nlp: '' });
+                setTimeout(() => showMirosEntryButton(), 500);
+              }
+              setTimeout(() => clearStatus(), 3000);
+            } else {
+              showStatus('No results found for this image.', 'error');
+              setTimeout(() => clearStatus(), 3000);
+            }
+          } catch (error) {
+            console.error('Miros image search failed:', error);
+            showStatus(`API error: ${error.message || 'Image search failed.'}`, 'error');
+            setTimeout(() => clearStatus(), 5000);
+          }
+        }
+
         // Landing search input handlers
         if (landingSearchInput) {
           const handleLandingSearch = () => {
             const searchValue = landingSearchInput.value.trim();
             if (!searchValue) return;
+            if (searchValue === 'Image search' && currentSearchImageUrl) {
+              showResultsSection();
+              performImageSearch(currentSearchImageUrl);
+              return;
+            }
+            currentSearchImageUrl = null;
             
             // Copy value to header search input
             if (searchInput) {
@@ -536,15 +732,7 @@
             }
           });
 
-          // Handle paste on landing search
-          landingSearchInput.addEventListener('paste', (e) => {
-            setTimeout(() => {
-              const pastedValue = landingSearchInput.value.trim();
-              if (pastedValue && (pastedValue.startsWith('http') || pastedValue.includes('/p/'))) {
-                handleLandingSearch();
-              }
-            }, 10);
-          });
+          landingSearchInput.addEventListener('paste', (e) => handleSearchPaste(e, landingSearchInput, handleLandingSearch));
         }
 
         // Enter focus mode on search input focus (only after first search)
@@ -565,34 +753,7 @@
             }, 200);
           });
 
-          // Handle paste events - both on input and document level for better image paste support
-          const handlePaste = async (e) => {
-            // Only handle if search input is focused or if it's a document-level paste
-            const isInputFocused = document.activeElement === searchInput;
-            const isDocumentPaste = e.target === document.body || e.target === document.documentElement;
-            
-            if (!isInputFocused && !isDocumentPaste) {
-              return;
-            }
-            
-            // Handle text paste (only if input is focused)
-            if (isInputFocused) {
-              setTimeout(() => {
-                const pastedValue = searchInput.value.trim();
-                if (pastedValue && (pastedValue.startsWith('http') || pastedValue.includes('/p/'))) {
-                  // Auto-trigger search for URLs
-                  if (searchInput) {
-                    setTimeout(() => {
-                      performSearch();
-                    }, 100);
-                  }
-                }
-              }, 10);
-            }
-          };
-          
-          // Add paste listener to input
-          searchInput.addEventListener('paste', handlePaste);
+          searchInput.addEventListener('paste', (e) => handleSearchPaste(e, searchInput, () => performSearch()));
 
           const triggerSearchOnEnter = (e) => {
             if (e.key === 'Enter') {
@@ -701,13 +862,20 @@
           selectedColors.clear();
           selectedMaterials.clear();
           selectedGenders.clear();
+          selectedSizes.clear();
+          selectedCategories.clear();
+          categoryFilterMode = 'all';
           allBrands.clear();
           allColors.clear();
           allMaterials.clear();
           allGenders.clear();
+          allSizes.clear();
+          allCategories.clear();
+          currentSearchImageUrl = null;
           currentSortMode = 'relevance';
           const sortSelectEl = document.getElementById('sortSelect');
           if (sortSelectEl) sortSelectEl.value = 'relevance';
+          populateCategorySelect([]);
           if (resultsBody) {
             resultsBody.innerHTML =
               '<div class="results-empty">Results cleared. Run a new search to see recommendations.</div>';
@@ -741,6 +909,11 @@
           selectedColors.clear();
           selectedMaterials.clear();
           selectedGenders.clear();
+          selectedSizes.clear();
+          selectedCategories.clear();
+          categoryFilterMode = 'all';
+          allCategories.clear();
+          populateCategorySelect([]);
           if (resultsBody) {
             resultsBody.innerHTML =
               '<div class="results-empty">Searching Miros for matching products...</div>';
@@ -897,9 +1070,12 @@
               url: item.url || item.productUrl || item.product_url || item.uri || '',
               imageUrl: item.imageUrl || item.image_url || item.image || item.img || '',
               brand: item.brand || item.brandName || '',
+              categoryId: (item.categoryId || item.category_id || '').toString().trim(),
+              categoryName: normalizeCategoryLabel(item.categoryName || item.category_name || item.category || '', (item.payload && item.payload.gender) ? item.payload.gender : item.gender),
               color: (item.payload && item.payload.color) ? item.payload.color : (item.color_name || item.color || item.colour || item.colour_name || ''),
               material: (item.payload && item.payload.material) ? item.payload.material : '',
               gender: (item.payload && item.payload.gender) ? item.payload.gender : (item.gender || ''),
+              sizes: Array.isArray(item.sizes) ? item.sizes : [],
               payload: item.payload || null,
               score: item.score !== undefined && item.score !== null ? parseFloat(item.score) : 0,
             }));
@@ -1050,149 +1226,354 @@
           }
         }
 
-        // Fetch all products via Miros GraphQL API using the recommendations query
-        // - Uses AI-powered semantic similarity matching via text_query
-        // - payload field carries color, material, gender, online_date for filters & sort
-        // - No score cutoff — all returned products are shown
-        async function fetchProductsViaAPI(rawValue) {
+        const CATEGORY_BY_ID_QUERY = `
+          query CategoryById($id: String!) {
+            category(id: $id) {
+              id
+              name
+            }
+          }
+        `;
+
+        const CATEGORY_ID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+        const toTitleCase = (value = '') => value
+          .toString()
+          .trim()
+          .toLowerCase()
+          .split(/\s+/)
+          .filter(Boolean)
+          .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+          .join(' ');
+
+        const normalizeCategoryLabel = (rawCategory = '', fallbackGender = '') => {
+          const raw = (rawCategory || '').toString().trim();
+          if (!raw) return '';
+          if (CATEGORY_ID_REGEX.test(raw)) return '';
+
+          const pathParts = raw
+            .split('>')
+            .map((part) => part.trim())
+            .filter(Boolean);
+
+          let candidate = pathParts.length > 1 ? pathParts[1] : (pathParts[0] || raw);
+          if (!candidate) return '';
+
+          candidate = candidate
+            .replace(/\b(women|woman|ladies|men|man|boys|boy|girls|girl|kids|kid|unisex)\b/gi, '')
+            .replace(/[\/|]+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+          const normalized = candidate.toLowerCase();
+          if (/shoe|footwear|sandal|sneaker|loafer|heel|boot/.test(normalized)) return 'Shoes';
+          if (/cloth|apparel|wear|dress|top|bottom|jean|shirt|pant|trouser|skirt|jacket|outerwear|activewear|loungewear/.test(normalized)) return 'Clothing';
+          if (/accessor|bag|belt|wallet|watch|jewel|sunglass|scarf|cap|hat/.test(normalized)) return 'Accessories';
+          if (/beauty|cosmetic|fragrance|perfume|makeup|skincare/.test(normalized)) return 'Beauty';
+
+          const titled = toTitleCase(candidate);
+          if (titled) return titled;
+
+          const gender = (fallbackGender || '').toString().trim();
+          return gender ? `${toTitleCase(gender)} Collection` : '';
+        };
+
+        const deriveCategoryName = (item = {}) => {
+          const payload = parseMirosPayload(item.payload);
+          const rawCategory = payload.category ||
+            payload.super_category ||
+            payload.department ||
+            payload.category_name ||
+            item.category_name ||
+            item.category ||
+            '';
+          return normalizeCategoryLabel(rawCategory, payload.gender || item.gender || '');
+        };
+
+        async function enrichProductsWithCategoryNames(products = []) {
+          if (!Array.isArray(products) || products.length === 0) return;
+
+          const categoryIds = [...new Set(products
+            .map((item) => (item.categoryId || item.category_id || '').toString().trim())
+            .filter(Boolean))];
+
+          const unresolvedCategoryIds = categoryIds.filter((id) => !categoryNameCache.has(id));
+          if (unresolvedCategoryIds.length > 0) {
+            await Promise.all(unresolvedCategoryIds.map(async (id) => {
+              try {
+                const data = await callMirosAPI(CATEGORY_BY_ID_QUERY, { id });
+                const categoryName = normalizeCategoryLabel(data?.category?.name || '');
+                categoryNameCache.set(id, categoryName);
+              } catch (error) {
+                console.warn(`Could not resolve category name for ${id}:`, error?.message || error);
+                categoryNameCache.set(id, '');
+              }
+            }));
+          }
+
+          products.forEach((item) => {
+            const categoryId = (item.categoryId || item.category_id || '').toString().trim();
+            const resolvedName = categoryId ? (categoryNameCache.get(categoryId) || '') : '';
+            const fallbackName = deriveCategoryName(item);
+            item.categoryId = categoryId;
+            item.categoryName = (resolvedName || fallbackName || '').toString().trim();
+          });
+        }
+
+        // Heuristic: treat compact alphanumeric tokens as SKU / item id (not free-text NLP).
+        const isSkuLikeQuery = (text = '') => /^[A-Za-z0-9_-]+$/.test(text) && text.length >= 3 && text.length <= 64;
+
+        const parseMirosPayload = (raw) => {
+          if (raw == null) return {};
+          if (typeof raw === 'object') return { ...raw };
+          if (typeof raw === 'string') {
+            try {
+              const parsed = JSON.parse(raw);
+              return parsed && typeof parsed === 'object' ? { ...parsed } : {};
+            } catch {
+              return {};
+            }
+          }
+          return {};
+        };
+
+        // Normalize a Miros search or recommendation record into our table row shape.
+        const normalizeMirosItem = (item = {}) => {
+          const score = item.score !== undefined && item.score !== null ? parseFloat(item.score) : 0;
+          const apiSizes = Array.isArray(item.sizes)
+            ? item.sizes.map((s) => String(s).trim()).filter(Boolean)
+            : [];
+          const payload = parseMirosPayload(item.payload);
+          if (apiSizes.length && !payload.sizes) payload.sizes = apiSizes;
+
+          return {
+            productTitle: item.name || item.alias || '-',
+            optionId: item.id || item.alias || '-',
+            url: item.url || '',
+            imageUrl: item.image || item.image_optimized || '',
+            brand: item.brand || '',
+            categoryId: (item.category_id || '').toString().trim(),
+            categoryName: deriveCategoryName(item),
+            color: payload.color || item.color_name || item.color || '',
+            material: payload.material || '',
+            gender: payload.gender || item.gender || '',
+            sizes: apiSizes,
+            payload: Object.keys(payload).length ? payload : null,
+            score,
+          };
+        };
+
+        const ingestMirosBatch = (items, aggregated, seenKeys) => {
+          let newItemsCount = 0;
+          let duplicateCount = 0;
+          for (const item of items) {
+            const normalized = normalizeMirosItem(item);
+            const key = (normalized.url || normalized.optionId || '').toLowerCase().trim();
+            if (!key || key === '-') {
+              console.warn('Skipping item with no URL or product ID:', normalized);
+              continue;
+            }
+            if (seenKeys.has(key)) {
+              duplicateCount++;
+              continue;
+            }
+            seenKeys.add(key);
+            aggregated.push(normalized);
+            newItemsCount++;
+          }
+          return { newItemsCount, duplicateCount };
+        };
+
+        // search resolver — SuggestionQueryInput (no sizes field). Best for broad NLP + pagination.
+        async function fetchProductsViaSearch(searchText) {
+          const searchQuery = `
+            query SearchProducts($integration_id: String!, $text_query: String!, $text_query_language: String!, $limit: Int!, $skip: Int!) {
+              search(query: {
+                integration_id: $integration_id,
+                text_query: $text_query,
+                text_query_language: $text_query_language,
+                limit: $limit,
+                skip: $skip,
+                sort: { field: score, order: desc }
+              }) {
+                data {
+                  id
+                  alias
+                  name
+                  url
+                  image
+                  brand
+                  category_id
+                  color_name
+                  price
+                  price_discounted
+                  score
+                  payload
+                }
+                has_more
+                approximate_hits
+              }
+            }
+          `;
+
+          const aggregated = [];
+          const seenKeys = new Set();
+          const batchSize = 200;
+          let skip = 0;
+          let hasMore = true;
+
+          console.log(`Fetching via search (batches of ${batchSize})…`);
+
+          while (hasMore) {
+            const data = await callMirosAPI(searchQuery, {
+              integration_id: MIROS_INTEGRATION_ID,
+              text_query: searchText,
+              text_query_language: 'en',
+              limit: batchSize,
+              skip,
+            });
+
+            const results = data?.search?.data || [];
+            hasMore = data?.search?.has_more === true;
+            console.log(`[search] skip=${skip}: ${results.length} items, has_more=${hasMore}, approximate_hits=${data?.search?.approximate_hits}`);
+
+            if (!results.length) break;
+
+            const { newItemsCount, duplicateCount } = ingestMirosBatch(results, aggregated, seenKeys);
+            console.log(`[search] skip=${skip}: +${newItemsCount}, dupes ${duplicateCount}, total ${aggregated.length}`);
+
+            skip += batchSize;
+            if (results.length < batchSize) break;
+          }
+
+          return aggregated;
+        }
+
+        // recommendations resolver — RecommendationQueryInput (sizes, text_query, item_id, image_url).
+        async function fetchProductsViaRecommendations(searchText, { sizes = null, preferItemId = false, imageUrl = null } = {}) {
+          const recommendationsQuery = `
+            query RecommendationsProducts(
+              $integration_id: String!
+              $text_query: String
+              $text_query_language: String!
+              $item_id: String
+              $image_url: String
+              $sizes: [String!]
+              $limit: Int!
+              $skip: Int!
+            ) {
+              recommendations(query: {
+                integration_id: $integration_id
+                text_query: $text_query
+                text_query_language: $text_query_language
+                item_id: $item_id
+                image_url: $image_url
+                sizes: $sizes
+                limit: $limit
+                skip: $skip
+              }) {
+                id
+                alias
+                name
+                url
+                image
+                brand
+                category_id
+                color_name
+                price
+                price_discounted
+                score
+                payload
+                sizes
+              }
+            }
+          `;
+
+          const aggregated = [];
+          const seenKeys = new Set();
+          const batchSize = 200;
+          let skip = 0;
+
+          const useImage = !!(imageUrl && String(imageUrl).trim());
+          const useItemId = !useImage && (preferItemId || isSkuLikeQuery(searchText));
+          console.log(
+            `Fetching via recommendations (image=${useImage}, item_id=${useItemId}, sizes=${sizes ? sizes.join(',') : 'none'})…`,
+          );
+
+          while (true) {
+            const variables = {
+              integration_id: MIROS_INTEGRATION_ID,
+              text_query_language: 'en',
+              limit: batchSize,
+              skip,
+              sizes: sizes && sizes.length > 0 ? sizes : null,
+              image_url: useImage ? String(imageUrl).trim() : null,
+              text_query: useImage || useItemId ? null : (searchText || null),
+              item_id: useItemId ? searchText : null,
+            };
+
+            const data = await callMirosAPI(recommendationsQuery, variables);
+            const results = Array.isArray(data?.recommendations) ? data.recommendations : [];
+            console.log(`[recommendations] skip=${skip}: ${results.length} items`);
+
+            if (!results.length) break;
+
+            const { newItemsCount } = ingestMirosBatch(results, aggregated, seenKeys);
+            console.log(`[recommendations] skip=${skip}: +${newItemsCount}, total ${aggregated.length}`);
+
+            skip += batchSize;
+            if (results.length < batchSize) break;
+          }
+
+          return aggregated;
+        }
+
+        // All product fetches use the recommendations resolver (sizes + image_url supported).
+        async function fetchProductsViaAPI(rawValue, options = {}) {
           if (!MIROS_API_KEY) {
             throw new Error('API key is required. Please configure MIROS_API_KEY.');
           }
 
-          const searchText = rawValue?.trim();
-          if (!searchText) {
-            throw new Error('Search term cannot be empty.');
+          const searchText = rawValue?.trim() || '';
+          const imageUrl = options.imageUrl || currentSearchImageUrl || null;
+          if (!searchText && !imageUrl) {
+            throw new Error('Search term or image is required.');
           }
 
-          const aggregated = [];
-          const seenKeys = new Set();
-          const ACTIVE_RESOLVER = 'search'; // 'search' | 'recommendations'
+          const sizesParam = Array.isArray(options.sizes) && options.sizes.length > 0
+            ? options.sizes
+            : (selectedSizes.size > 0 ? Array.from(selectedSizes) : null);
+
+          const ACTIVE_RESOLVER = 'recommendations';
+          const queryLabel = imageUrl ? '[image search]' : `"${searchText}"`;
 
           console.log(`%c🔍 Active resolver: ${ACTIVE_RESOLVER}`, 'color: #00bcd4; font-weight: bold; font-size: 13px;');
-          console.log(`Starting API fetch for: "${searchText}"`);
+          console.log(`Starting API fetch for: ${queryLabel}`, sizesParam ? { sizes: sizesParam } : {});
 
           try {
-            console.log('Using search query with text_query...');
+            const aggregated = await fetchProductsViaRecommendations(searchText, {
+              sizes: sizesParam,
+              preferItemId: isSkuLikeQuery(searchText),
+              imageUrl,
+            });
 
-            const searchQuery = `
-              query SearchProducts($integration_id: String!, $text_query: String!, $text_query_language: String!, $limit: Int!, $skip: Int!) {
-                search(query: {
-                  integration_id: $integration_id,
-                  text_query: $text_query,
-                  text_query_language: $text_query_language,
-                  limit: $limit,
-                  skip: $skip,
-                  sort: { field: score, order: desc }
-                }) {
-                  data {
-                    id
-                    alias
-                    name
-                    url
-                    image
-                    brand
-                    category_id
-                    color_name
-                    price
-                    price_discounted
-                    score
-                    payload
-                  }
-                  has_more
-                  approximate_hits
-                }
-              }
-            `;
-
-            const batchSize = 200;
-            let skip = 0;
-            let hasMore = true;
-
-            console.log(`Fetching all available products via search (batches of ${batchSize}, no upper limit)...`);
-
-            while (hasMore) {
-              try {
-                const data = await callMirosAPI(searchQuery, {
-                  integration_id: MIROS_INTEGRATION_ID,
-                  text_query: searchText,
-                  text_query_language: "en",
-                  limit: batchSize,
-                  skip: skip
-                });
-
-                const results = data?.search?.data || [];
-                hasMore = data?.search?.has_more === true;
-                console.log(`Batch skip=${skip}: received ${results.length} results, has_more=${hasMore}, approximate_hits=${data?.search?.approximate_hits}`);
-
-                if (!results.length) break;
-
-                let newItemsCount = 0;
-                let duplicateCount = 0;
-
-                for (const item of results) {
-                  const score = item.score !== undefined && item.score !== null ? parseFloat(item.score) : 0;
-
-                  const normalized = {
-                    productTitle: item.name || item.alias || '-',
-                    optionId: item.id || item.alias || '-',
-                    url: item.url || '',
-                    imageUrl: item.image || item.image_optimized || '',
-                    brand: item.brand || '',
-                    color: (item.payload && item.payload.color) ? item.payload.color : (item.color_name || item.color || ''),
-                    material: (item.payload && item.payload.material) ? item.payload.material : '',
-                    gender: (item.payload && item.payload.gender) ? item.payload.gender : (item.gender || ''),
-                    payload: item.payload || null,
-                    score: score,
-                  };
-
-                  const key = (normalized.url || normalized.optionId || '').toLowerCase().trim();
-
-                  if (!key || key === '-') {
-                    console.warn('Skipping item with no URL or product ID:', normalized);
-                    continue;
-                  }
-
-                  if (seenKeys.has(key)) {
-                    duplicateCount++;
-                    continue;
-                  }
-
-                  seenKeys.add(key);
-                  aggregated.push(normalized);
-                  newItemsCount++;
-                }
-
-                console.log(`Batch skip=${skip}: added ${newItemsCount}, skipped ${duplicateCount} duplicates. Total so far: ${aggregated.length}`);
-
-                skip += batchSize;
-
-                // Stop if this batch returned fewer items than requested (no more pages)
-                if (results.length < batchSize) break;
-
-              } catch (error) {
-                console.error(`Error fetching search batch at skip=${skip}:`, error);
-                if (aggregated.length > 0) {
-                  console.warn(`Stopping pagination early, returning ${aggregated.length} products`);
-                  break;
-                }
-                throw error;
-              }
-            }
-
-            console.log(`✅ Search fetch complete: ${aggregated.length} unique products found`);
+            console.log(`✅ ${ACTIVE_RESOLVER} fetch complete: ${aggregated.length} unique products`);
 
             if (aggregated.length === 0) {
-              throw new Error('No results returned from API. Try a different search term or check if products exist in the Miros database.');
+              if (sizesParam && sizesParam.length > 0) {
+                return [];
+              }
+              throw new Error(
+                imageUrl
+                  ? 'No results returned for this image. Try another image or check your Miros integration.'
+                  : 'No results returned from API. Try a different search term or check if products exist in the Miros database.',
+              );
             }
 
+            await enrichProductsWithCategoryNames(aggregated);
             return aggregated;
-
           } catch (error) {
-            console.error('Error fetching search results:', error);
-            if (aggregated.length > 0) {
-              console.warn(`Returning ${aggregated.length} products despite error`);
-              return aggregated;
-            }
+            console.error(`Error fetching ${ACTIVE_RESOLVER} results:`, error);
             throw error;
           }
         }
@@ -2238,7 +2619,7 @@
           const countElement = document.querySelector('#filtersHeaderResultsCount .filters-header-results-count__number');
           if (countElement) {
             // Check if any filters are active
-            const hasActiveFilters = selectedBrands.size > 0 || selectedColors.size > 0 || selectedMaterials.size > 0 || selectedGenders.size > 0;
+            const hasActiveFilters = selectedBrands.size > 0 || selectedColors.size > 0 || selectedMaterials.size > 0 || selectedGenders.size > 0 || selectedCategories.size > 0 || selectedSizes.size > 0;
             
             // If filters are active, show filtered count, otherwise show total count
             const count = hasActiveFilters 
@@ -2766,26 +3147,304 @@
         };
 
 
+        // ------------------------------------------------------------------
+        // Global filter facets — fetched once via a wildcard search so that
+        // the filter dropdowns expose the full catalog universe (not just
+        // values that happened to appear in the current search results).
+        //
+        // Shape returned by Miros (filter_facets is a JSON scalar — exact
+        // shape varies, so the parser is tolerant):
+        //   { "brand": ["X","Y"], ... }
+        //   { "brand": [{ "value": "X", "count": 12 }, ...], ... }
+        // ------------------------------------------------------------------
+        const FILTER_FACETS_QUERY = `
+          query FilterFacets($integration_id: String!) {
+            search(
+              query: {
+                integration_id: $integration_id
+                text_query: ""
+                limit: 1
+              }
+            ) {
+              filter_facets
+            }
+          }
+        `;
+
+        const globalFacets = {
+          brands: new Set(),
+          categories: new Set(),
+          colors: new Set(),
+          materials: new Set(),
+          genders: new Set(),
+          sizes: new Set(),
+          ready: false,
+        };
+
+        let _globalFacetsPromise = null;
+
+        async function fetchGlobalFilterFacets() {
+          if (globalFacets.ready) return globalFacets;
+          if (_globalFacetsPromise) return _globalFacetsPromise;
+
+          _globalFacetsPromise = (async () => {
+            try {
+              console.log('🌐 Fetching global filter_facets…');
+              const data = await callMirosAPI(FILTER_FACETS_QUERY, {
+                integration_id: MIROS_INTEGRATION_ID,
+              });
+              const facets = data && data.search ? data.search.filter_facets : null;
+              console.log('🌐 raw filter_facets payload:', facets);
+
+              if (!facets || typeof facets !== 'object') {
+                console.warn('⚠️ filter_facets returned empty/invalid; skipping global universe.');
+                return globalFacets;
+              }
+
+              const collectValues = (raw) => {
+                if (!Array.isArray(raw)) return [];
+                return raw
+                  .map((entry) => {
+                    if (entry == null) return '';
+                    if (typeof entry === 'string' || typeof entry === 'number') return String(entry);
+                    if (typeof entry === 'object') {
+                      return entry.value || entry.name || entry.label || entry.id || entry.title || '';
+                    }
+                    return '';
+                  })
+                  .map((s) => String(s).trim())
+                  .filter(Boolean);
+              };
+
+              const KEY_MAP = [
+                { aliases: ['brand', 'brands'],                                         target: globalFacets.brands },
+                { aliases: ['category', 'categories', 'category_id', 'category_ids'],   target: globalFacets.categories, isCategory: true },
+                { aliases: ['color', 'colors', 'color_name', 'color_names'],            target: globalFacets.colors },
+                { aliases: ['material', 'materials'],                                   target: globalFacets.materials },
+                { aliases: ['gender', 'genders'],                                       target: globalFacets.genders, isGender: true },
+                { aliases: ['size', 'sizes'],                                           target: globalFacets.sizes },
+              ];
+
+              const categoryIdsToResolve = [];
+
+              for (const { aliases, target, isCategory, isGender } of KEY_MAP) {
+                for (const key of aliases) {
+                  if (!Array.isArray(facets[key])) continue;
+                  const values = collectValues(facets[key]);
+                  for (const v of values) {
+                    if (isCategory) {
+                      if (CATEGORY_ID_REGEX.test(v)) {
+                        categoryIdsToResolve.push(v);
+                      } else {
+                        const norm = normalizeCategoryLabel(v);
+                        if (norm) target.add(norm);
+                      }
+                    } else if (isGender) {
+                      const norm = normalizeGenderLabel(v);
+                      if (norm) target.add(norm);
+                    } else {
+                      target.add(v);
+                    }
+                  }
+                }
+              }
+
+              // Resolve category IDs to human names via the existing per-id query.
+              // Cached in categoryNameCache so subsequent searches benefit too.
+              if (categoryIdsToResolve.length) {
+                const uniqueIds = Array.from(new Set(categoryIdsToResolve));
+                console.log(`🌐 resolving ${uniqueIds.length} category id(s) from filter_facets…`);
+                await Promise.all(uniqueIds.map(async (id) => {
+                  try {
+                    let rawName = categoryNameCache.get(id);
+                    if (!rawName) {
+                      const res = await callMirosAPI(CATEGORY_BY_ID_QUERY, { id });
+                      rawName = res && res.category ? res.category.name : '';
+                      if (rawName) categoryNameCache.set(id, rawName);
+                    }
+                    const norm = normalizeCategoryLabel(rawName || '');
+                    if (norm) globalFacets.categories.add(norm);
+                  } catch (e) { /* skip individual failures */ }
+                }));
+              }
+
+              globalFacets.ready = true;
+              console.log('🌐 globalFacets ready', {
+                brands:     globalFacets.brands.size,
+                categories: globalFacets.categories.size,
+                colors:     globalFacets.colors.size,
+                materials:  globalFacets.materials.size,
+                genders:    globalFacets.genders.size,
+                sizes:      globalFacets.sizes.size,
+              });
+            } catch (err) {
+              console.error('⚠️ fetchGlobalFilterFacets failed:', err);
+            }
+            return globalFacets;
+          })();
+
+          return _globalFacetsPromise;
+        }
+
+        // ------------------------------------------------------------------
+        // Gender normalization — whitelist only human-readable labels.
+        // Drops garbage like "[object Object]", numeric IDs, or stringified
+        // objects. Returns canonical label or '' if value is unusable.
+        // ------------------------------------------------------------------
+        function normalizeGenderLabel(raw) {
+          if (raw == null) return '';
+          // Coerce to string safely (never output [object Object])
+          let str = '';
+          if (typeof raw === 'string') {
+            str = raw;
+          } else if (typeof raw === 'number' || typeof raw === 'boolean') {
+            str = String(raw);
+          } else if (Array.isArray(raw)) {
+            str = raw.filter(Boolean).map(v => String(v)).join(' ');
+          } else if (typeof raw === 'object') {
+            // Try common props on object-shaped gender payloads
+            str = raw.name || raw.label || raw.value || raw.title || '';
+            if (!str) return '';
+          }
+
+          str = str.trim();
+          if (!str || str === '[object Object]') return '';
+
+          const lower = str.toLowerCase();
+
+          // Canonical buckets (order matters — more specific first)
+          const MAP = [
+            { re: /\bbaby|infant|newborn|toddler\b/, label: 'Baby' },
+            { re: /\bboys?\b/,                      label: 'Boys' },
+            { re: /\bgirls?\b/,                     label: 'Girls' },
+            { re: /\bkids?|children|child|junior\b/, label: 'Kids' },
+            { re: /\bunisex\b/,                     label: 'Unisex' },
+            { re: /\bwom[ae]n|ladies|female\b/,     label: 'Women' },
+            { re: /\bmen\b|\bmale\b|\bmens\b/,      label: 'Men' },
+          ];
+
+          for (const { re, label } of MAP) {
+            if (re.test(lower)) return label;
+          }
+          return '';
+        }
+
+        // Pull size labels from product payload (for populating the Size filter list)
+        function extractSizesFromPayload(payload) {
+          const p = parseMirosPayload(payload);
+          if (!Object.keys(p).length) return [];
+          const out = [];
+          const push = (v) => {
+            if (v == null) return;
+            if (Array.isArray(v)) {
+              v.forEach(push);
+              return;
+            }
+            if (typeof v === 'object') {
+              push(v.size || v.label || v.name || v.value);
+              return;
+            }
+            const s = String(v).trim();
+            if (s) out.push(s);
+          };
+          push(p.sizes);
+          push(p.size);
+          push(p.available_sizes);
+          push(p.availableSizes);
+          push(p.size_options);
+          push(p.sizeOptions);
+          if (Array.isArray(p.variants)) {
+            p.variants.forEach((variant) => push(variant?.size || variant?.label || variant?.name));
+          }
+          return out;
+        }
+
+        // Re-run the current query via recommendations (sizes + image_url supported).
+        // Brand, color, etc. remain client-side on the returned set.
+        async function refetchSearchWithActiveFilters() {
+          const query = currentSearchImageUrl ? '' : (currentSearchQuery || (searchInput ? searchInput.value.trim() : ''));
+          if ((!query && !currentSearchImageUrl) || !hasSearched) return;
+
+          if (_sizeRefetchPromise) return _sizeRefetchPromise;
+
+          _sizeRefetchPromise = (async () => {
+            const sizes = selectedSizes.size > 0 ? Array.from(selectedSizes) : null;
+            showStatus(
+              sizes ? `Filtering by size: ${sizes.join(', ')}…` : 'Removing size filter…',
+              'pending',
+            );
+            try {
+              const apiResults = await fetchProductsViaAPI(query, {
+                sizes,
+                imageUrl: currentSearchImageUrl || undefined,
+              });
+              appendUniqueProducts(apiResults, { reset: true, silent: false });
+              extractFilterOptions();
+              applyFilters();
+              updateFilterUI();
+              if (allProducts.length > 0) {
+                showStatus(
+                  sizes
+                    ? `Loaded ${allProducts.length} products for sizes: ${sizes.join(', ')}.`
+                    : `Loaded ${allProducts.length} products.`,
+                  'success',
+                );
+              } else {
+                if (resultsBody) {
+                  resultsBody.innerHTML = '<div class="results-empty">No products match the selected sizes for this search.</div>';
+                }
+                summariseResults(0);
+                updatePaginationInfo();
+                showStatus('No products match the selected sizes for this search.', 'info');
+              }
+              setTimeout(() => clearStatus(), 2500);
+            } catch (err) {
+              console.error('Size refetch failed:', err);
+              showStatus(err.message || 'Could not update results for size filter.', 'error');
+              setTimeout(() => clearStatus(), 4000);
+            } finally {
+              _sizeRefetchPromise = null;
+            }
+          })();
+
+          return _sizeRefetchPromise;
+        }
+
         // Extract unique brands, colors, and materials from products
         function extractFilterOptions() {
           allBrands.clear();
           allColors.clear();
           allMaterials.clear();
           allGenders.clear();
+          allSizes.clear();
+          allCategories.clear();
           
           originalProducts.forEach(product => {
             try {
               if (product.brand && product.brand.trim()) allBrands.add(product.brand.trim());
+              if (product.categoryName && product.categoryName.trim()) allCategories.add(product.categoryName.trim());
               if (product.color && product.color.trim()) allColors.add(product.color.trim());
               if (product.material && product.material.trim()) allMaterials.add(product.material.trim());
-              if (product.gender && product.gender.trim()) allGenders.add(product.gender.trim());
+              const normalizedGender = normalizeGenderLabel(product.gender);
+              if (normalizedGender) {
+                product.gender = normalizedGender; // write-back so filter matching uses normalized value
+                allGenders.add(normalizedGender);
+              } else {
+                product.gender = '';
+              }
+              extractSizesFromPayload(product.payload).forEach((sz) => allSizes.add(sz));
+              if (Array.isArray(product.sizes)) {
+                product.sizes.forEach((sz) => allSizes.add(sz));
+              }
             } catch (e) { /* skip malformed product */ }
           });
           
           console.log('Extracted brands:', Array.from(allBrands));
+          console.log('Extracted categories:', Array.from(allCategories));
           console.log('Extracted colors:', Array.from(allColors));
           console.log('Extracted materials:', Array.from(allMaterials));
           console.log('Extracted genders:', Array.from(allGenders));
+          console.log('Extracted sizes:', Array.from(allSizes));
           
           // Update filter options based on current selections (synchronized filtering)
           try {
@@ -2800,6 +3459,15 @@
 
         // Get available filter options based on other selected filters (synchronized filtering)
         function getAvailableFilterOptions(type) {
+          // Size options come from global facets + payload-derived values (not client-side product filter)
+          if (type === 'size') {
+            const merged = new Set([...allSizes]);
+            if (globalFacets.sizes.size > 0) {
+              globalFacets.sizes.forEach((v) => merged.add(v));
+            }
+            return Array.from(merged).sort((a, b) => a.localeCompare(b));
+          }
+
           // Start with all original products
           let filteredProducts = [...originalProducts];
           
@@ -2810,6 +3478,13 @@
             filteredProducts = filteredProducts.filter(product => {
               const brand = strTrim(product.brand);
               return brand && selectedBrands.has(brand);
+            });
+          }
+
+          if (type !== 'category' && selectedCategories.size > 0) {
+            filteredProducts = filteredProducts.filter(product => {
+              const category = strTrim(product.categoryName);
+              return category && selectedCategories.has(category);
             });
           }
           
@@ -2840,28 +3515,83 @@
             try {
               const val = (v) => v != null ? String(v).trim() : '';
               if (type === 'brand') { const v = val(product.brand); if (v) availableOptions.add(v); }
+              else if (type === 'category') { const v = val(product.categoryName); if (v) availableOptions.add(v); }
               else if (type === 'color') { const v = val(product.color); if (v) availableOptions.add(v); }
               else if (type === 'material') { const v = val(product.material); if (v) availableOptions.add(v); }
               else if (type === 'gender') { const v = val(product.gender); if (v) availableOptions.add(v); }
             } catch (e) { /* skip malformed product */ }
           });
-          
-          return Array.from(availableOptions).sort();
+
+          // Union with the global filter_facets universe so options aren't
+          // limited to whatever happened to come back in the current search.
+          // Trade-off accepted: a user may pick a value that yields 0 results
+          // in the current query — that's fine, this bridges the gap.
+          const globalSet =
+            type === 'brand'    ? globalFacets.brands :
+            type === 'category' ? globalFacets.categories :
+            type === 'color'    ? globalFacets.colors :
+            type === 'material' ? globalFacets.materials :
+            type === 'gender'   ? globalFacets.genders : null;
+          if (globalSet && globalSet.size > 0) {
+            globalSet.forEach((v) => availableOptions.add(v));
+          }
+
+          return Array.from(availableOptions).sort((a, b) => a.localeCompare(b));
         }
 
         // Update filter options based on synchronized filtering logic
         function updateSynchronizedFilterOptions() {
           // Get available options for each filter based on other selected filters
           const availableBrands = getAvailableFilterOptions('brand');
+          const availableCategories = getAvailableFilterOptions('category');
           const availableColors = getAvailableFilterOptions('color');
           const availableMaterials = getAvailableFilterOptions('material');
           const availableGenders = getAvailableFilterOptions('gender');
           
           // Populate filter options with synchronized data
           populateFilterOptions('brand', availableBrands);
+          populateCategorySelect(availableCategories);
           populateFilterOptions('color', availableColors);
           populateFilterOptions('material', availableMaterials);
           populateFilterOptions('gender', availableGenders);
+          populateFilterOptions('size', getAvailableFilterOptions('size'));
+        }
+
+        function populateCategorySelect(options = []) {
+          const sortedOptions = [...new Set(options.filter(Boolean))].sort((a, b) => a.localeCompare(b));
+
+          // Prune any previously-selected categories that no longer exist in the current dataset
+          let prunedAny = false;
+          Array.from(selectedCategories).forEach((name) => {
+            if (!sortedOptions.includes(name)) {
+              selectedCategories.delete(name);
+              prunedAny = true;
+            }
+          });
+          // Auto-revert to 'all' mode if nothing is selected anymore
+          if (prunedAny && selectedCategories.size === 0) {
+            categoryFilterMode = 'all';
+          }
+
+          // Keep the legacy hidden <select> in a benign state (not used for UX)
+          if (categorySelect) {
+            categorySelect.innerHTML = '';
+            const allOption = document.createElement('option');
+            allOption.value = '';
+            allOption.textContent = 'All Categories';
+            categorySelect.appendChild(allOption);
+            sortedOptions.forEach((categoryName) => {
+              const option = document.createElement('option');
+              option.value = categoryName;
+              option.textContent = categoryName;
+              categorySelect.appendChild(option);
+            });
+            categorySelect.value = '';
+            categorySelect.disabled = true;
+          }
+
+          // Render the drawer checkbox list (actual UX)
+          try { populateCategoryDrawerOptions(sortedOptions); } catch (e) { /* ignore */ }
         }
 
         // Populate filter dropdown options
@@ -2897,7 +3627,11 @@
             checkbox.type = 'checkbox';
             checkbox.id = `${type}-${option}`;
             checkbox.value = option;
-            const selectedSet = type === 'brand' ? selectedBrands : (type === 'color' ? selectedColors : (type === 'material' ? selectedMaterials : (type === 'gender' ? selectedGenders : new Set())));
+            const selectedSet = type === 'brand' ? selectedBrands
+              : (type === 'color' ? selectedColors
+              : (type === 'material' ? selectedMaterials
+              : (type === 'gender' ? selectedGenders
+              : (type === 'size' ? selectedSizes : new Set()))));
             checkbox.checked = selectedSet.has(option);
             if (checkbox.checked) {
               optionEl.classList.add('selected');
@@ -2929,6 +3663,14 @@
                 } else {
                   selectedGenders.delete(value);
                 }
+              } else if (type === 'size') {
+                if (e.target.checked) {
+                  selectedSizes.add(value);
+                } else {
+                  selectedSizes.delete(value);
+                }
+                refetchSearchWithActiveFilters();
+                return;
               }
               
               // Update synchronized filter options when a filter changes
@@ -2969,12 +3711,59 @@
           updateFilterSelectedDisplay('material', selectedMaterials);
           // Update gender filter selected display
           updateFilterSelectedDisplay('gender', selectedGenders);
-          
-          // Show/hide clear button
+          // Update size filter selected display
+          updateFilterSelectedDisplay('size', selectedSizes);
+          // Category chip in filters bar (single-value)
+          updateCategoryChipDisplay();
+
+          // Show/hide clear button (in filters bar)
           const clearBtn = document.getElementById('clearFiltersBtn');
           if (clearBtn) {
-            clearBtn.style.display = (selectedBrands.size > 0 || selectedColors.size > 0 || selectedMaterials.size > 0 || selectedGenders.size > 0) ? 'block' : 'none';
+            const anyActive = selectedBrands.size > 0 || selectedColors.size > 0 || selectedMaterials.size > 0 || selectedGenders.size > 0 || selectedCategories.size > 0 || selectedSizes.size > 0;
+            clearBtn.style.display = anyActive ? 'inline-flex' : 'none';
           }
+
+          // Refresh drawer meta labels + badge count
+          try { updateDrawerMetaLabels(); } catch (e) { /* ignore */ }
+        }
+
+        // Render / refresh category chips in the filters bar (one per selected)
+        function updateCategoryChipDisplay() {
+          const container = document.getElementById('selectedFiltersContainer');
+          if (!container) return;
+          const existing = container.querySelectorAll('[data-filter-type="category"]');
+          existing.forEach(el => el.remove());
+          if (selectedCategories.size === 0) return;
+
+          // Insert chips at the front (category takes visual priority); preserve A→Z
+          const sorted = Array.from(selectedCategories).sort((a, b) => a.localeCompare(b));
+          // Build a fragment then prepend so order stays ascending
+          const frag = document.createDocumentFragment();
+          sorted.forEach((name) => {
+            const tag = document.createElement('span');
+            tag.className = 'filter-tag';
+            tag.setAttribute('data-filter-type', 'category');
+            tag.innerHTML = `
+              ${escapeHtml(name)}
+              <button type="button" class="filter-tag__remove" data-type="category" data-value="${escapeAttr(name)}" aria-label="Remove ${escapeAttr(name)} filter">×</button>
+            `;
+            frag.appendChild(tag);
+          });
+          container.insertBefore(frag, container.firstChild);
+
+          // Wire remove handlers
+          container.querySelectorAll('[data-filter-type="category"] .filter-tag__remove').forEach((btn) => {
+            btn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              const val = btn.dataset.value;
+              if (val) selectedCategories.delete(val);
+              // Auto-revert to 'all' mode when last individual is removed
+              if (selectedCategories.size === 0) categoryFilterMode = 'all';
+              updateSynchronizedFilterOptions();
+              updateFilterUI();
+              applyFilters();
+            });
+          });
         }
 
         function updateFilterSelectedDisplay(type, selectedSet) {
@@ -2997,7 +3786,7 @@
               if (selectedSet.size > 0) {
                 placeholder.textContent = `${selectedSet.size} selected`;
               } else {
-                const placeholderText = type === 'brand' ? 'Select brands...' : (type === 'color' ? 'Select colors...' : (type === 'material' ? 'Select materials...' : (type === 'gender' ? 'Select genders...' : 'Select...')));
+                const placeholderText = type === 'brand' ? 'Select brands...' : (type === 'color' ? 'Select colors...' : (type === 'material' ? 'Select materials...' : (type === 'gender' ? 'Select genders...' : (type === 'size' ? 'Select sizes...' : 'Select...'))));
                 placeholder.textContent = placeholderText;
               }
             }
@@ -3050,6 +3839,15 @@
                   selectedMaterials.delete(filterValue);
                 } else if (filterType === 'gender') {
                   selectedGenders.delete(filterValue);
+                } else if (filterType === 'size') {
+                  selectedSizes.delete(filterValue);
+                  const sizeCb = document.querySelector(`#sizeFilterOptions input[value="${CSS.escape(filterValue)}"]`);
+                  if (sizeCb) {
+                    sizeCb.checked = false;
+                    sizeCb.closest('.filter-option')?.classList.remove('selected');
+                  }
+                  refetchSearchWithActiveFilters();
+                  return;
                 }
                 // Update synchronized filter options when a filter tag is removed
                 updateSynchronizedFilterOptions();
@@ -3091,6 +3889,14 @@
             filtered = filtered.filter(product => {
               const brand = s(product.brand);
               return brand && selectedBrands.has(brand);
+            });
+          }
+
+          // Apply category filter (multi-select; empty set = no filter = "All")
+          if (selectedCategories.size > 0) {
+            filtered = filtered.filter(product => {
+              const category = s(product.categoryName);
+              return category && selectedCategories.has(category);
             });
           }
           
@@ -3146,7 +3952,7 @@
 
         // Setup filter dropdown toggles
         function setupFilterDropdowns() {
-          ['brand', 'color', 'material', 'gender'].forEach(type => {
+          ['brand', 'color', 'material', 'gender', 'size'].forEach(type => {
             const selectedEl = document.getElementById(`${type}FilterSelected`);
             const dropdownEl = document.getElementById(`${type}FilterDropdown`);
             
@@ -3207,6 +4013,13 @@
               selectedColors.clear();
               selectedMaterials.clear();
               selectedGenders.clear();
+              const hadSizes = selectedSizes.size > 0;
+              selectedSizes.clear();
+              selectedCategories.clear();
+              categoryFilterMode = 'all';
+              if (categorySelect) {
+                categorySelect.value = '';
+              }
               
               // Uncheck all brand filter checkboxes
               const brandFilterOptions = document.getElementById('brandFilterOptions');
@@ -3259,33 +4072,305 @@
                   }
                 });
               }
+
+              // Uncheck all size filter checkboxes
+              const sizeFilterOptions = document.getElementById('sizeFilterOptions');
+              if (sizeFilterOptions) {
+                const checkboxes = sizeFilterOptions.querySelectorAll('input[type="checkbox"]');
+                checkboxes.forEach(checkbox => {
+                  checkbox.checked = false;
+                  const optionEl = checkbox.closest('.filter-option');
+                  if (optionEl) {
+                    optionEl.classList.remove('selected');
+                  }
+                });
+              }
               
               // Update synchronized filter options after clearing
+              updateSynchronizedFilterOptions();
+              updateFilterUI();
+              if (hadSizes && hasSearched && currentSearchQuery) {
+                refetchSearchWithActiveFilters();
+              } else {
+                applyFilters();
+              }
+            });
+          }
+        }
+
+        // ------------------------------------------------------------------
+        // Filters Drawer setup — relocates legacy filter groups into drawer
+        // accordion sections, wires open/close, accordion behavior, and
+        // chip-bar updates. No-op safe if DOM nodes aren't present.
+        // ------------------------------------------------------------------
+        function setupFiltersDrawer() {
+          const drawer = document.getElementById('filtersDrawer');
+          const trigger = document.getElementById('filtersDrawerTrigger');
+          const body = document.getElementById('filtersDrawerBody');
+          if (!drawer || !trigger || !body) return;
+
+          // Relocate each legacy filter-multiselect into its drawer section body
+          const MOVE_MAP = [
+            { section: 'size',     from: 'sizeFilter' },
+            { section: 'gender',   from: 'genderFilter' },
+            { section: 'brand',    from: 'brandFilter' },
+            { section: 'color',    from: 'colorFilter' },
+            { section: 'material', from: 'materialFilter' },
+          ];
+
+          MOVE_MAP.forEach(({ section, from }) => {
+            const source = document.getElementById(from);
+            const targetSection = body.querySelector(`.drawer-section[data-section="${section}"]`);
+            const targetBody = targetSection ? targetSection.querySelector('.drawer-section__body') : null;
+            if (!source || !targetBody) return;
+            const ms = source.querySelector('.filter-multiselect');
+            if (ms) {
+              targetBody.appendChild(ms);
+              // Force the legacy dropdown to be permanently visible inline inside the drawer
+              const dd = ms.querySelector('.filter-multiselect__dropdown');
+              if (dd) {
+                dd.style.display = 'flex';
+                // Guard against setupFilterDropdowns outside-click handler hiding it
+                const observer = new MutationObserver(() => {
+                  if (dd.style.display === 'none') dd.style.display = 'flex';
+                });
+                observer.observe(dd, { attributes: true, attributeFilter: ['style'] });
+              }
+            }
+          });
+
+          // Build Category radio list container inside category section
+          const categoryBody = document.getElementById('drawerBodyCategory');
+          if (categoryBody && !categoryBody.querySelector('.drawer-category-list')) {
+            const list = document.createElement('div');
+            list.className = 'drawer-category-list';
+            list.id = 'drawerCategoryList';
+            categoryBody.appendChild(list);
+          }
+
+          // Accordion toggle
+          body.querySelectorAll('.drawer-section__head').forEach(head => {
+            head.addEventListener('click', () => {
+              const expanded = head.getAttribute('aria-expanded') === 'true';
+              head.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+            });
+          });
+
+          // Open / close
+          const open = () => {
+            drawer.classList.add('open');
+            drawer.setAttribute('aria-hidden', 'false');
+            trigger.setAttribute('aria-expanded', 'true');
+            document.body.classList.add('drawer-open');
+            const panel = drawer.querySelector('.filters-drawer__panel');
+            if (panel) setTimeout(() => panel.focus(), 50);
+          };
+          const close = () => {
+            drawer.classList.remove('open');
+            drawer.setAttribute('aria-hidden', 'true');
+            trigger.setAttribute('aria-expanded', 'false');
+            document.body.classList.remove('drawer-open');
+            trigger.focus();
+          };
+
+          trigger.addEventListener('click', () => {
+            const isOpen = drawer.classList.contains('open');
+            if (isOpen) close(); else open();
+          });
+
+          drawer.querySelectorAll('[data-drawer-close]').forEach(el => {
+            el.addEventListener('click', close);
+          });
+
+          document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && drawer.classList.contains('open')) {
+              close();
+            }
+          });
+
+          // Apply button just closes drawer (filters are applied live on change)
+          const applyBtn = document.getElementById('drawerApply');
+          if (applyBtn) applyBtn.addEventListener('click', close);
+
+          // Clear All button in drawer footer mirrors the legacy clear btn
+          const drawerClear = document.getElementById('drawerClearAll');
+          const legacyClear = document.getElementById('clearFiltersBtn');
+          if (drawerClear && legacyClear) {
+            drawerClear.addEventListener('click', () => legacyClear.click());
+          }
+        }
+
+        // ------------------------------------------------------------------
+        // Render the drawer's Category section as a checkbox list with a
+        // special "All categories" toggle at the top.
+        //
+        //   categoryFilterMode === 'all'   → "All" is CHECKED; individuals
+        //                                    are visually greyed and NOT
+        //                                    clickable (input disabled).
+        //   categoryFilterMode === 'multi' → "All" is UNCHECKED; individuals
+        //                                    are enabled; selectedCategories
+        //                                    drives their checked state.
+        //
+        // Clicking "All":
+        //   - in 'all'   → flips to 'multi', individuals unlock, set stays empty
+        //   - in 'multi' → flips to 'all', clears set, individuals disable
+        //
+        // Clicking an individual (only possible in 'multi'):
+        //   - toggles membership in selectedCategories
+        //   - if the last one is removed, auto-revert to 'all' mode
+        // ------------------------------------------------------------------
+        function populateCategoryDrawerOptions(options = []) {
+          const list = document.getElementById('drawerCategoryList');
+          if (!list) return;
+
+          const sorted = [...new Set(options.filter(Boolean))].sort((a, b) => a.localeCompare(b));
+          const isAllMode = categoryFilterMode === 'all';
+
+          list.innerHTML = '';
+
+          // "All categories" row
+          const allRow = document.createElement('label');
+          allRow.className = 'drawer-category-option drawer-category-option--all' + (isAllMode ? ' selected' : '');
+          allRow.innerHTML = `
+            <input type="checkbox" data-role="all-categories" ${isAllMode ? 'checked' : ''}>
+            <span>All categories</span>
+          `;
+          list.appendChild(allRow);
+
+          // Divider
+          const divider = document.createElement('div');
+          divider.className = 'drawer-category-divider';
+          list.appendChild(divider);
+
+          if (sorted.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'drawer-empty-state';
+            empty.textContent = 'No categories available for current filters.';
+            list.appendChild(empty);
+          } else {
+            sorted.forEach((name) => {
+              const isChecked = selectedCategories.has(name);
+              const row = document.createElement('label');
+              const rowCls = [
+                'drawer-category-option',
+                isChecked ? 'selected' : '',
+                isAllMode ? 'drawer-category-option--disabled' : '',
+              ].filter(Boolean).join(' ');
+              row.className = rowCls;
+              row.innerHTML = `
+                <input type="checkbox" data-role="category-item" value="${escapeAttr(name)}"
+                  ${isChecked ? 'checked' : ''} ${isAllMode ? 'disabled' : ''}>
+                <span>${escapeHtml(name)}</span>
+              `;
+              list.appendChild(row);
+            });
+          }
+
+          // Prevent label clicks from firing when the option row is disabled
+          list.querySelectorAll('.drawer-category-option--disabled').forEach((row) => {
+            row.addEventListener('click', (e) => {
+              // Allow the "All" checkbox to still receive clicks (it's a sibling)
+              if (!e.target.closest('.drawer-category-option--all')) {
+                e.preventDefault();
+                e.stopPropagation();
+              }
+            });
+          });
+
+          // "All" toggle handler
+          const allCheckbox = list.querySelector('input[data-role="all-categories"]');
+          if (allCheckbox) {
+            allCheckbox.addEventListener('change', () => {
+              if (categoryFilterMode === 'all') {
+                // Was 'all' → flip to 'multi', unlock individuals, leave set empty
+                categoryFilterMode = 'multi';
+                // The checkbox just became unchecked by browser — keep it that way
+              } else {
+                // Was 'multi' → flip to 'all', clear set, lock individuals
+                categoryFilterMode = 'all';
+                selectedCategories.clear();
+              }
               updateSynchronizedFilterOptions();
               updateFilterUI();
               applyFilters();
             });
           }
+
+          // Individual category checkbox handlers
+          list.querySelectorAll('input[data-role="category-item"]').forEach((cb) => {
+            cb.addEventListener('change', () => {
+              if (categoryFilterMode === 'all') {
+                // Safety: shouldn't happen (disabled), but roll back if it does
+                cb.checked = false;
+                return;
+              }
+              const val = cb.value;
+              if (cb.checked) {
+                selectedCategories.add(val);
+              } else {
+                selectedCategories.delete(val);
+              }
+              // Auto-revert to 'all' mode when the last individual is removed
+              if (selectedCategories.size === 0) {
+                categoryFilterMode = 'all';
+              }
+              updateSynchronizedFilterOptions();
+              updateFilterUI();
+              applyFilters();
+            });
+          });
         }
 
-        // Upload image and get data URL (no backend needed - widget handles it)
-        const uploadImageToMiros = async (file) => {
-          return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            
-            reader.onload = (e) => {
-              const imageUrl = e.target.result; // Data URL
-              resolve({ imageUrl });
-            };
-            
-            reader.onerror = () => {
-              reject(new Error("Failed to read image file"));
-            };
-            
-            reader.readAsDataURL(file);
-          });
-        };
+        // Small HTML-escape utilities (safe injection of category names)
+        function escapeHtml(s) {
+          return String(s == null ? '' : s).replace(/[&<>"']/g, m => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+          })[m]);
+        }
+        function escapeAttr(s) { return escapeHtml(s); }
 
+        // ------------------------------------------------------------------
+        // Update drawer section "meta" labels + filters bar badge based on
+        // current selections.
+        // ------------------------------------------------------------------
+        function updateDrawerMetaLabels() {
+          const setMeta = (id, text, isActive) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.textContent = text;
+            el.classList.toggle('drawer-section__meta--active', !!isActive);
+          };
+
+          const fmtMulti = (set) => {
+            if (!set || set.size === 0) return '';
+            if (set.size === 1) return Array.from(set)[0];
+            return `${set.size} selected`;
+          };
+
+          setMeta('drawerMetaCategory', fmtMulti(selectedCategories), selectedCategories.size > 0);
+          setMeta('drawerMetaSize',     fmtMulti(selectedSizes),      selectedSizes.size > 0);
+          setMeta('drawerMetaGender',   fmtMulti(selectedGenders),    selectedGenders.size > 0);
+          setMeta('drawerMetaBrand',    fmtMulti(selectedBrands),     selectedBrands.size > 0);
+          setMeta('drawerMetaColor',    fmtMulti(selectedColors),     selectedColors.size > 0);
+          setMeta('drawerMetaMaterial', fmtMulti(selectedMaterials),  selectedMaterials.size > 0);
+
+          const badge = document.getElementById('filtersBarBadge');
+          if (badge) {
+            const count =
+              selectedCategories.size +
+              selectedSizes.size +
+              selectedGenders.size +
+              selectedBrands.size +
+              selectedColors.size +
+              selectedMaterials.size;
+            if (count > 0) {
+              badge.textContent = String(count);
+              badge.style.display = 'inline-flex';
+            } else {
+              badge.style.display = 'none';
+            }
+          }
+        }
 
         // Main search function - API only method
         const performSearch = async () => {
@@ -3296,7 +4381,13 @@
               showStatus("Enter a search term or SKU to continue.", "error");
               return;
             }
-            
+
+            if (rawValue === 'Image search' && currentSearchImageUrl) {
+              await performImageSearch(currentSearchImageUrl);
+              return;
+            }
+
+            currentSearchImageUrl = null;
             // Store current search query for filename generation
             currentSearchQuery = rawValue;
 
@@ -3477,6 +4568,22 @@
 
         // Initialize filter dropdowns
         setupFilterDropdowns();
+
+        // Relocate filter groups into drawer sections + wire drawer open/close
+        setupFiltersDrawer();
+
+        // Kick off the global filter_facets fetch in the background. When it
+        // resolves, refresh the drawer so the wider universe of options shows
+        // up — even if a search has already completed by then.
+        fetchGlobalFilterFacets()
+          .then(() => {
+            try { updateSynchronizedFilterOptions(); } catch (e) { /* no-op */ }
+          })
+          .catch((e) => console.error('Global filter_facets prefetch failed:', e));
+
+        // Legacy <select id="categorySelect"> is now hidden and replaced by the
+        // multi-select checkbox list inside the filters drawer. We intentionally
+        // don't bind a change listener here — the drawer owns all category state.
 
         // Sort dropdown
         const sortSelect = document.getElementById('sortSelect');
